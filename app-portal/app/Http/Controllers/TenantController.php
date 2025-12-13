@@ -452,7 +452,7 @@ class TenantController extends Controller
                 'domain' => $validated['domain'],
                 'admin_name' => $validated['admin_name'],
                 'admin_email' => $validated['admin_email'],
-                'admin_password' => bcrypt($validated['admin_password']), // Hash password
+                'admin_password' => $validated['admin_password'], // Store plain password for Keycloak (token is encrypted)
                 'plan_id' => $plan->id,
             ]);
 

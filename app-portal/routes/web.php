@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\KeycloakController;
 use App\Http\Controllers\Central\AppointmentController as CentralAppointmentController;
 use App\Http\Controllers\Central\CalendarController as CentralCalendarController;
 use App\Http\Controllers\Central\CentralDashboardController;
@@ -657,6 +658,10 @@ foreach (config('tenancy.central_domains') as $domain) {
         // require __DIR__.'/settings.php';
         require __DIR__.'/auth.php';
         require __DIR__.'/diagnostic-routes.php';
+
+        // Keycloak callback route - must be on central domain (not tenant domain)
+        // This allows Keycloak to redirect to a fixed URL without wildcards
+        Route::get('/auth/keycloak/callback', [KeycloakController::class, 'callback'])->name('keycloak.callback');
 
         // Guest-only routes (register, login, etc.) - protected by central-guest middleware
         Route::middleware('central-guest')->group(function () {

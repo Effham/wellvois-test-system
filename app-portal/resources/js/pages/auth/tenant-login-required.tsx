@@ -25,7 +25,7 @@ export default function TenantLoginRequired() {
                                     Each tenant has its own domain. Please use your tenant's specific domain URL to log in.
                                     <br />
                                     <br />
-                                    Example: <code className="text-xs bg-gray-100 px-2 py-1 rounded">your-tenant.app.localhost:8000/login</code>
+                                    Example: <code className="text-xs bg-gray-100 px-2 py-1 rounded">your-tenant.localhost:8000/login</code>
                                 </AlertDescription>
                             </Alert>
                         </div>

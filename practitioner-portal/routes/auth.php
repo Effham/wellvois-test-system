@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
+use App\Http\Controllers\Auth\KeycloakController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -16,12 +17,16 @@ Route::middleware('central-guest')->group(function () {
 
     Route::post('register', [RegisteredUserController::class, 'store']);
 
+    // Keycloak authentication routes
+    Route::get('login/keycloak', [KeycloakController::class, 'redirect'])->name('keycloak.login');
+    Route::get('auth/keycloak/callback', [KeycloakController::class, 'callback'])->name('keycloak.callback');
+
     // Practitioner login - ONLY route for practitioner portal
     Route::get('practitioner/login', [AuthenticatedSessionController::class, 'create'])
         ->defaults('intent', 'practitioner')
         ->name('login.practitioner');
 
-    // Practitioner login POST
+    // Practitioner login POST (kept for backward compatibility, but not used with Keycloak)
     Route::post('practitioner/login', [AuthenticatedSessionController::class, 'store'])
         ->defaults('intent', 'practitioner')
         ->name('login');

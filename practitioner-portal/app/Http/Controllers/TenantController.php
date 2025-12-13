@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Mail\TenantWelcomeMail;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\KeycloakUserService;
 use App\Services\RegistrationDataService;
 use App\Services\TenantSessionService;
 use Illuminate\Http\Request;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Stripe\Stripe;
@@ -717,13 +719,57 @@ class TenantController extends Controller
                 'tenant_id' => $tenant->id,
             ]);
 
+            // Create Keycloak user first
+            $keycloakUserService = app(KeycloakUserService::class);
+            $keycloakUserId = null;
+            
+            try {
+                // Split name into first and last name
+                $nameParts = explode(' ', $registrationData['admin_name'], 2);
+                $firstName = $nameParts[0] ?? $registrationData['admin_name'];
+                $lastName = $nameParts[1] ?? '';
+
+                // Generate temporary password for Keycloak
+                $temporaryPassword = Str::random(16);
+
+                // Create user in Keycloak
+                $keycloakUserId = $keycloakUserService->createUser(
+                    $registrationData['admin_email'],
+                    $firstName,
+                    $lastName,
+                    $temporaryPassword,
+                    true // Email verified
+                );
+
+                if ($keycloakUserId) {
+                    Log::info('Keycloak user created during tenant setup', [
+                        'email' => $registrationData['admin_email'],
+                        'keycloak_user_id' => $keycloakUserId,
+                        'tenant_id' => $tenant->id,
+                    ]);
+                } else {
+                    Log::warning('Failed to create Keycloak user, continuing with Laravel user creation', [
+                        'email' => $registrationData['admin_email'],
+                        'tenant_id' => $tenant->id,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Exception creating Keycloak user during tenant setup', [
+                    'email' => $registrationData['admin_email'],
+                    'error' => $e->getMessage(),
+                    'tenant_id' => $tenant->id,
+                ]);
+                // Continue with Laravel user creation even if Keycloak fails
+            }
+
             // Create/update user in tenant database
             $tenantUser = User::updateOrCreate(
                 ['email' => $registrationData['admin_email']],
                 [
                     'name' => $registrationData['admin_name'],
-                    'password' => bcrypt($registrationData['admin_password']),
+                    'password' => bcrypt(Str::random(64)), // Random password since we use Keycloak
                     'email_verified_at' => now(),
+                    'keycloak_user_id' => $keycloakUserId,
                 ]
             );
 

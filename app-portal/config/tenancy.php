@@ -15,11 +15,14 @@ return [
      * The list of domains hosting your central app.
      *
      * Only relevant if you're using the domain or subdomain identification middleware.
+     * 
+     * Uses localhost for local development (not app.localhost).
+     * CENTRAL_DOMAIN env var can be comma-separated list or single domain.
      */
-    'central_domains' => [
-        env('CENTRAL_DOMAIN', 'app.localhost'),
-        'localhost', // Development alias
-    ],
+    'central_domains' => array_filter(array_unique(array_merge(
+        explode(',', env('CENTRAL_DOMAIN', 'localhost')),
+        ['localhost'] // Always use localhost for local development
+    ))),
 
     /**
      * Tenancy bootstrappers are executed when tenancy is initialized.

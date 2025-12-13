@@ -31,6 +31,7 @@ class User extends Authenticatable
         'created_via_public_portal',
         'google2fa_secret',
         'google2fa_enabled',
+        'keycloak_user_id',
     ];
 
     /**

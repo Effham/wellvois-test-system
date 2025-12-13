@@ -1,5 +1,5 @@
-import { Head, useForm, router } from '@inertiajs/react';
-import { LoaderCircle, Eye, EyeOff, Stethoscope, User } from 'lucide-react';
+import { Head, useForm, router, usePage } from '@inertiajs/react';
+import { LoaderCircle, Eye, EyeOff, Stethoscope, User, LogIn } from 'lucide-react';
 import { FormEventHandler, useState, useEffect } from 'react';
 
 import InputError from '@/components/input-error';
@@ -31,6 +31,14 @@ interface LoginProps {
 }
 
 export default function Login({ status, canResetPassword, tenant, tenantLogo, intent, isTenantLogin }: LoginProps) {
+    const { errors: pageErrors } = usePage().props as any;
+    const [isKeycloakRedirecting, setIsKeycloakRedirecting] = useState(false);
+
+    const handleKeycloakLogin = () => {
+        setIsKeycloakRedirecting(true);
+        // Use window.location.href for full browser redirect (required for OAuth)
+        window.location.href = route('keycloak.login');
+    };
     // App portal uses tenant-specific login - no intent needed
     const { data, setData, post, processing, errors, reset } = useForm<Required<LoginForm>>({
         email: '',
@@ -121,6 +129,42 @@ export default function Login({ status, canResetPassword, tenant, tenantLogo, in
                         {status && (
                             <div className="mb-4 rounded-lg bg-green-50 p-4 text-center text-sm font-medium text-green-600">
                                 {status}
+                            </div>
+                        )}
+
+                        {/* Error Message */}
+                        {pageErrors?.keycloak && (
+                            <div className="mb-4 rounded-lg bg-red-50 p-4 text-center text-sm font-medium text-red-600">
+                                {pageErrors.keycloak}
+                            </div>
+                        )}
+
+                        {/* Keycloak Login Button */}
+                        {isTenantLogin && (
+                            <div className="mb-6">
+                                <Button 
+                                    onClick={handleKeycloakLogin}
+                                    disabled={isKeycloakRedirecting}
+                                    className="w-full h-12 sm:h-14 bg-gradient-to-r from-[#A100FF] to-[#0500C9] text-white rounded-lg font-semibold shadow-lg hover:from-[#8A00E0] hover:to-[#3A00B8] transition-all duration-200 text-base sm:text-lg flex items-center justify-center gap-2"
+                                >
+                                    {isKeycloakRedirecting ? (
+                                        <>
+                                            <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            <span>Redirecting...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <LogIn className="h-5 w-5" />
+                                            <span>Login with WELLOVIS</span>
+                                        </>
+                                    )}
+                                </Button>
+
+                                <div className="mt-4 flex items-center">
+                                    <div className="flex-1 border-t border-gray-300"></div>
+                                    <span className="px-4 text-sm text-gray-500">or</span>
+                                    <div className="flex-1 border-t border-gray-300"></div>
+                                </div>
                             </div>
                         )}
                         

@@ -1569,6 +1569,9 @@ Route::middleware([
 
     // Tenant-specific login route - each tenant has its own login screen
     Route::middleware('guest')->group(function () {
+        // Keycloak redirect route (stays in tenant.php - needs tenant context)
+        Route::get('/login/keycloak', [\App\Http\Controllers\Auth\KeycloakController::class, 'redirect'])->name('keycloak.login');
+
         Route::get('/login', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'createTenant'])
             ->name('login');
         

@@ -19,7 +19,6 @@ return [
     */
 
     'default' => env('LOG_CHANNEL', 'stack'),
-    // 'default' => null,
 
     /*
     |--------------------------------------------------------------------------
@@ -55,7 +54,7 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', env('LOG_STACK', 'single')),
+            'channels' => array_filter(explode(',', env('LOG_STACK', 'single'))),
             'ignore_exceptions' => false,
         ],
 

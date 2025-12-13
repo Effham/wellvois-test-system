@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\KeycloakUserService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,6 +14,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class CreateTenantJob implements ShouldQueue
 {
@@ -70,13 +72,66 @@ class CreateTenantJob implements ShouldQueue
                     ]);
 
                     // Get or create central user and attach to tenant
-                    $centralUser = tenancy()->central(function () {
+                    // Check if Keycloak user needs to be created
+                    $keycloakUserService = app(KeycloakUserService::class);
+                    $keycloakUserId = null;
+                    
+                    // Check if user exists and has Keycloak user ID
+                    $existingCentralUser = tenancy()->central(function () {
+                        return User::where('email', $this->registrationData['admin_email'])->first();
+                    });
+                    
+                    if ($existingCentralUser && !$existingCentralUser->keycloak_user_id) {
+                        // User exists but doesn't have Keycloak user ID, create one
+                        try {
+                            $nameParts = explode(' ', $this->registrationData['admin_name'], 2);
+                            $firstName = $nameParts[0] ?? $this->registrationData['admin_name'];
+                            $lastName = $nameParts[1] ?? '';
+                            
+                            // Use the password from registration data (should be plain text)
+                            $adminPassword = $this->registrationData['admin_password'] ?? null;
+                            
+                            $keycloakUserId = $keycloakUserService->createUser(
+                                $this->registrationData['admin_email'],
+                                $firstName,
+                                $lastName,
+                                $adminPassword,
+                                false // Not temporary - user can use this password directly
+                            );
+                            
+                            if ($keycloakUserId) {
+                                tenancy()->central(function () use ($existingCentralUser, $keycloakUserId) {
+                                    $existingCentralUser->keycloak_user_id = $keycloakUserId;
+                                    $existingCentralUser->save();
+                                });
+                                Log::info('[CREATE_TENANT_JOB] Created Keycloak user for existing central user', [
+                                    'email' => $this->registrationData['admin_email'],
+                                    'keycloak_user_id' => $keycloakUserId,
+                                ]);
+                            }
+                        } catch (\Exception $e) {
+                            Log::error('[CREATE_TENANT_JOB] Exception creating Keycloak user for existing user', [
+                                'email' => $this->registrationData['admin_email'],
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    } else if ($existingCentralUser) {
+                        $keycloakUserId = $existingCentralUser->keycloak_user_id;
+                    }
+                    
+                    $centralUser = tenancy()->central(function () use ($keycloakUserId) {
+                        // Hash the password for Laravel storage (from registration data)
+                        $hashedPassword = isset($this->registrationData['admin_password']) 
+                            ? bcrypt($this->registrationData['admin_password'])
+                            : bcrypt(Str::random(64));
+                        
                         return User::firstOrCreate(
                             ['email' => $this->registrationData['admin_email']],
                             [
                                 'name' => $this->registrationData['admin_name'],
-                                'password' => $this->registrationData['admin_password'],
+                                'password' => $hashedPassword,
                                 'email_verified_at' => now(),
+                                'keycloak_user_id' => $keycloakUserId,
                             ]
                         );
                     });
@@ -209,16 +264,73 @@ class CreateTenantJob implements ShouldQueue
             ]);
 
             // Step 7: Get or create central user (must use tenancy()->central() since we're in tenant context)
-            $centralUser = tenancy()->central(function () {
+            // Create Keycloak user first for central user
+            $keycloakUserService = app(KeycloakUserService::class);
+            $keycloakUserId = null;
+            
+            try {
+                // Split name into first and last name
+                $nameParts = explode(' ', $this->registrationData['admin_name'], 2);
+                $firstName = $nameParts[0] ?? $this->registrationData['admin_name'];
+                $lastName = $nameParts[1] ?? '';
+
+                // Use the password from registration data (should be plain text)
+                // The password is stored as plain text in the encrypted registration token
+                $adminPassword = $this->registrationData['admin_password'] ?? null;
+                
+                if (!$adminPassword) {
+                    Log::warning('[CREATE_TENANT_JOB] No password provided, creating Keycloak user without password', [
+                        'email' => $this->registrationData['admin_email'],
+                    ]);
+                    $adminPassword = null;
+                }
+
+                // Create user in Keycloak with the provided password
+                $keycloakUserId = $keycloakUserService->createUser(
+                    $this->registrationData['admin_email'],
+                    $firstName,
+                    $lastName,
+                    $adminPassword,
+                    false // Not temporary - user can use this password directly
+                );
+
+                if ($keycloakUserId) {
+                    Log::info('[CREATE_TENANT_JOB] Keycloak user created for central user', [
+                        'email' => $this->registrationData['admin_email'],
+                        'keycloak_user_id' => $keycloakUserId,
+                    ]);
+                } else {
+                    Log::warning('[CREATE_TENANT_JOB] Failed to create Keycloak user, continuing with Laravel user creation', [
+                        'email' => $this->registrationData['admin_email'],
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('[CREATE_TENANT_JOB] Exception creating Keycloak user', [
+                    'email' => $this->registrationData['admin_email'],
+                    'error' => $e->getMessage(),
+                ]);
+                // Continue with Laravel user creation even if Keycloak fails
+            }
+
+            $centralUser = tenancy()->central(function () use ($keycloakUserId) {
                 return User::firstOrCreate(
                     ['email' => $this->registrationData['admin_email']],
                     [
                         'name' => $this->registrationData['admin_name'],
-                        'password' => $this->registrationData['admin_password'],
+                        'password' => bcrypt(Str::random(64)), // Random password since we use Keycloak
                         'email_verified_at' => now(),
+                        'keycloak_user_id' => $keycloakUserId,
                     ]
                 );
             });
+
+            // Update keycloak_user_id if user already existed but didn't have it
+            if ($centralUser && !$centralUser->keycloak_user_id && $keycloakUserId) {
+                tenancy()->central(function () use ($centralUser, $keycloakUserId) {
+                    $centralUser->keycloak_user_id = $keycloakUserId;
+                    $centralUser->save();
+                });
+            }
 
             // Attach central user to tenant if not already attached
             tenancy()->central(function () use ($centralUser, $tenant) {
@@ -282,7 +394,7 @@ class CreateTenantJob implements ShouldQueue
                         ->where('id', $existingTenantUser->id)
                         ->update([
                             'name' => $this->registrationData['admin_name'],
-                            'password' => bcrypt($this->registrationData['admin_password']),
+                            'password' => bcrypt(Str::random(64)), // Random password since we use Keycloak
                             'email_verified_at' => now(),
                             'updated_at' => now(),
                         ]);
@@ -294,11 +406,12 @@ class CreateTenantJob implements ShouldQueue
                         'email' => $this->registrationData['admin_email'],
                     ]);
                 } else {
-                    // Create new user
+                    // Create new tenant user
+                    // Note: keycloak_user_id is stored in central database, not tenant database
                     $userId = DB::table('users')->insertGetId([
                         'name' => $this->registrationData['admin_name'],
                         'email' => $this->registrationData['admin_email'],
-                        'password' => bcrypt($this->registrationData['admin_password']),
+                        'password' => bcrypt(Str::random(64)), // Random password since we use Keycloak
                         'email_verified_at' => now(),
                         'created_at' => now(),
                         'updated_at' => now(),
@@ -309,6 +422,7 @@ class CreateTenantJob implements ShouldQueue
                     Log::info('[CREATE_TENANT_JOB] Tenant user created', [
                         'user_id' => $tenantUser->id,
                         'email' => $this->registrationData['admin_email'],
+                        'keycloak_user_id' => $keycloakUserId,
                     ]);
                 }
 

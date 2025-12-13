@@ -37,7 +37,8 @@ run_portal() {
 }
 
 # Start all portals in background
-run_portal "app-portal" "8000" "app.localhost"
+# App portal uses localhost only (not app.localhost)
+run_portal "app-portal" "8000" "localhost"
 run_portal "practitioner-portal" "8001" "practitioner.localhost"
 run_portal "patient-portal" "8002" "patient.localhost"
 run_portal "admin-portal" "8003" "admin.localhost"
@@ -45,7 +46,7 @@ run_portal "admin-portal" "8003" "admin.localhost"
 echo -e "${GREEN}All portals started!${NC}"
 echo ""
 echo -e "${YELLOW}Access URLs:${NC}"
-echo "  App Portal:        http://app.localhost:8000"
+echo "  App Portal:        http://localhost:8000"
 echo "  Practitioner Portal: http://practitioner.localhost:8001"
 echo "  Patient Portal:    http://patient.localhost:8002"
 echo "  Admin Portal:      http://admin.localhost:8003"
