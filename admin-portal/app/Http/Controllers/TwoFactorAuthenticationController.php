@@ -120,7 +120,7 @@ class TwoFactorAuthenticationController extends Controller
             return redirect()->route('admin.login')->with('status', 'Two-factor authentication cancelled. Please log in again.');
         }
         
-        return redirect()->route('login.intent')->with('status', 'Two-factor authentication cancelled. Please log in again.');
+        return redirect()->route('admin.login')->with('status', 'Two-factor authentication cancelled. Please log in again.');
     }
 
     /**

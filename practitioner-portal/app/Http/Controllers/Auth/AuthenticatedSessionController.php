@@ -54,9 +54,9 @@ class AuthenticatedSessionController extends Controller
             }
         }
 
-        // Validate intent - redirect to intent selector if invalid
-        if (! in_array($intent, ['practitioner', 'patient'])) {
-            return redirect()->route('login.intent');
+        // Practitioner portal only supports practitioner intent
+        if ($intent !== 'practitioner') {
+            $intent = 'practitioner';
         }
 
         // Check for intended URL from document access (query parameter from tenant domain)
@@ -112,10 +112,9 @@ class AuthenticatedSessionController extends Controller
         // Get intent from session or request
         $intent = session('login_intent') ?? $request->input('intent');
 
-        // Validate intent for practitioner/patient login
-        if (! in_array($intent, ['practitioner', 'patient'])) {
-            return redirect()->route('login.intent')
-                ->withErrors(['intent' => 'Please select a login type.']);
+        // Practitioner portal only supports practitioner intent
+        if ($intent !== 'practitioner') {
+            $intent = 'practitioner';
         }
 
         $request->authenticate();
@@ -250,7 +249,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         // This should not happen due to validation above, but fallback
-        return redirect()->route('login.intent')
+        return redirect()->route('login.practitioner')
             ->withErrors(['email' => 'Invalid login attempt.']);
     }
 
@@ -284,8 +283,8 @@ class AuthenticatedSessionController extends Controller
             return Inertia::location(route('public-portal.index'));
         }
 
-        // Default redirect to intent selector page with full page reload
-        return Inertia::location(route('login.intent'));
+        // Default redirect to practitioner login page with full page reload
+        return Inertia::location(route('login.practitioner'));
     }
 
     public function showPatientRegistration($token)
@@ -381,8 +380,8 @@ class AuthenticatedSessionController extends Controller
             $centralUser->tenants()->syncWithoutDetaching([$tenant->id]);
         });
 
-        // Redirect to intent selector page
-        return redirect()->route('login.intent')->with('success', 'Account created successfully. Please log in.');
+        // Redirect to practitioner login page
+        return redirect()->route('login.practitioner')->with('success', 'Account created successfully. Please log in.');
     }
 
     /**
@@ -821,7 +820,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         // Fallback: Should not reach here, but handle gracefully
-        return redirect()->route('login.intent')
+        return redirect()->route('login.practitioner')
             ->withErrors(['email' => 'Invalid login attempt.']);
     }
 }

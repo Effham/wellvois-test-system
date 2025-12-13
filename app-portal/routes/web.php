@@ -25,7 +25,8 @@ foreach (config('tenancy.central_domains') as $domain) {
     Route::domain($domain)->group(function () {
 
         Route::get('/', function () {
-            return redirect()->route('login.intent');
+            // App portal has no central login - redirect to a message or tenant selection
+            return Inertia::render('auth/tenant-login-required');
         })->name('home');
 
         // Health check routes - public access
@@ -132,7 +133,7 @@ foreach (config('tenancy.central_domains') as $domain) {
                     'current_time' => time(),
                 ]);
 
-                return redirect()->route('login.intent')->with('error', 'Authentication link has expired. Please try again.');
+                return redirect('/')->with('error', 'Authentication link has expired. Please try again.');
             }
 
             // Get user and validate hash
@@ -140,7 +141,7 @@ foreach (config('tenancy.central_domains') as $domain) {
             if (! $user) {
                 \Illuminate\Support\Facades\Log::error('Public portal auth user not found', ['user_id' => $userId]);
 
-                return redirect()->route('login.intent')->with('error', 'User not found. Please try again.');
+                return redirect('/')->with('error', 'User not found. Please try again.');
             }
 
             // Create expected hash
@@ -153,7 +154,7 @@ foreach (config('tenancy.central_domains') as $domain) {
                     'received' => $hash,
                 ]);
 
-                return redirect()->route('login.intent')->with('error', 'Invalid authentication link. Please try again.');
+                return redirect('/')->with('error', 'Invalid authentication link. Please try again.');
             }
 
             // Authenticate the user

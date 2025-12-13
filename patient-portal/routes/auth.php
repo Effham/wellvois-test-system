@@ -16,27 +16,14 @@ Route::middleware('central-guest')->group(function () {
 
     Route::post('register', [RegisteredUserController::class, 'store']);
 
-    // Intent selector page (default login route)
-    Route::get('login', [AuthenticatedSessionController::class, 'selectIntent'])
-        ->name('login.intent');
-
-    // Practitioner/Patient login (with intent query parameter)
-    Route::get('login/practitioner', [AuthenticatedSessionController::class, 'create'])
-        ->defaults('intent', 'practitioner')
-        ->name('login.practitioner');
-
-    Route::get('login/patient', [AuthenticatedSessionController::class, 'create'])
+    // Patient login - ONLY route for patient portal
+    Route::get('patient/login', [AuthenticatedSessionController::class, 'create'])
         ->defaults('intent', 'patient')
         ->name('login.patient');
 
-    // Admin login
-    Route::get('admin/login', [AuthenticatedSessionController::class, 'createAdmin'])
-        ->name('admin.login');
-
-    Route::post('admin/login', [AuthenticatedSessionController::class, 'storeAdmin']);
-
-    // Practitioner/Patient login POST (handles both intents)
-    Route::post('login', [AuthenticatedSessionController::class, 'store'])
+    // Patient login POST
+    Route::post('patient/login', [AuthenticatedSessionController::class, 'store'])
+        ->defaults('intent', 'patient')
         ->name('login');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])

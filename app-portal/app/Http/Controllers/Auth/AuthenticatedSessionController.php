@@ -56,7 +56,7 @@ class AuthenticatedSessionController extends Controller
 
         // Validate intent - redirect to intent selector if invalid
         if (! in_array($intent, ['practitioner', 'patient'])) {
-            return redirect()->route('login.intent');
+            return redirect()->route('login');
         }
 
         // Check for intended URL from document access (query parameter from tenant domain)
@@ -105,6 +105,119 @@ class AuthenticatedSessionController extends Controller
     }
 
     /**
+     * Show the tenant-specific login page.
+     */
+    public function createTenant(Request $request): Response
+    {
+        // Check for intended URL from document access
+        if ($request->has('intended')) {
+            session(['intended' => $request->query('intended')]);
+        }
+
+        // Check for document access token
+        if ($request->has('document_access_token')) {
+            session(['document_access_token' => $request->query('document_access_token')]);
+        }
+
+        // Get tenant information
+        $tenant = tenant();
+        $tenantName = $tenant ? ($tenant->company_name ?? Str::title($tenant->id)) : 'Tenant';
+
+        return Inertia::render('auth/login', [
+            'canResetPassword' => Route::has('password.request'),
+            'status' => $request->session()->get('status'),
+            'tenant' => $tenantName,
+            'isTenantLogin' => true,
+        ]);
+    }
+
+    /**
+     * Handle tenant-specific authentication request.
+     */
+    public function storeTenant(LoginRequest $request)
+    {
+        // Authenticate against central database
+        $request->authenticate();
+        Session::regenerate();
+
+        // Store login timestamp for absolute session timeout enforcement
+        session(['login_time' => now()->timestamp]);
+
+        $user = Auth::user();
+        
+        // Verify user has access to this tenant
+        $currentTenant = tenant();
+        if (!$currentTenant) {
+            Auth::logout();
+            return redirect()->route('login')
+                ->withErrors(['email' => 'Tenant context not available.']);
+        }
+
+        // Check if user has access to this tenant via central tenant_user pivot table
+        $hasTenantAccess = tenancy()->central(function () use ($user, $currentTenant) {
+            return \Illuminate\Support\Facades\DB::table('tenant_user')
+                ->where('user_id', $user->id)
+                ->where('tenant_id', $currentTenant->id)
+                ->exists();
+        });
+
+        if (!$hasTenantAccess) {
+            Auth::logout();
+            return redirect()->route('login')
+                ->withErrors(['email' => 'You do not have access to this tenant.']);
+        }
+
+        // Ensure user exists in tenant database with proper roles
+        $tenantUser = User::firstOrCreate(
+            ['email' => $user->email],
+            [
+                'name' => $user->name,
+                'email' => $user->email,
+                'email_verified_at' => $user->email_verified_at,
+                'password' => $user->password,
+            ]
+        );
+
+        // Assign default role if user has no roles in tenant
+        if ($tenantUser->roles->isEmpty()) {
+            // Check if user is a practitioner in central
+            $isPractitioner = tenancy()->central(function () use ($user) {
+                return \App\Models\Practitioner::where('user_id', $user->id)->exists();
+            });
+            
+            if ($isPractitioner) {
+                $tenantUser->assignRole('Practitioner');
+            } else {
+                // Default to Admin role for tenant access
+                $tenantUser->assignRole('Admin');
+            }
+        }
+
+        Mail::to($user->email)->send(
+            new UserSessionActivityMail($user, 'login', now())
+        );
+
+        // Check if 2FA is enabled for the user and not already passed in this session
+        if ($user->google2fa_enabled && ! session('2fa_passed')) {
+            // Store user ID in session temporarily before 2FA verification
+            session(['2fa_user_id' => $user->id]);
+            session(['login_intent' => 'tenant']); // Preserve tenant intent for after 2FA
+
+            return redirect()->route('two-factor-authentication.challenge');
+        }
+
+        // Clear global logout flag when user logs in
+        $globalLogoutService = app(GlobalLogoutService::class);
+        $globalLogoutService->clearGlobalLogoutFlag($user->email);
+
+        // Get intended URL or default to tenant dashboard
+        $intendedUrl = session()->pull('intended', '/dashboard');
+
+        // Redirect to tenant dashboard
+        return redirect($intendedUrl);
+    }
+
+    /**
      * Handle an incoming authentication request (practitioner/patient).
      */
     public function store(LoginRequest $request)
@@ -114,8 +227,8 @@ class AuthenticatedSessionController extends Controller
 
         // Validate intent for practitioner/patient login
         if (! in_array($intent, ['practitioner', 'patient'])) {
-            return redirect()->route('login.intent')
-                ->withErrors(['intent' => 'Please select a login type.']);
+            return redirect()->route('login')
+                ->withErrors(['intent' => 'Please use tenant login.']);
         }
 
         $request->authenticate();
@@ -250,7 +363,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         // This should not happen due to validation above, but fallback
-        return redirect()->route('login.intent')
+        return redirect()->route('login')
             ->withErrors(['email' => 'Invalid login attempt.']);
     }
 
@@ -285,7 +398,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         // Default redirect to intent selector page with full page reload
-        return Inertia::location(route('login.intent'));
+        return Inertia::location(route('login'));
     }
 
     public function showPatientRegistration($token)
@@ -382,7 +495,7 @@ class AuthenticatedSessionController extends Controller
         });
 
         // Redirect to intent selector page
-        return redirect()->route('login.intent')->with('success', 'Account created successfully. Please log in.');
+        return redirect()->route('login')->with('success', 'Account created successfully. Please log in.');
     }
 
     /**
@@ -821,7 +934,7 @@ class AuthenticatedSessionController extends Controller
         }
 
         // Fallback: Should not reach here, but handle gracefully
-        return redirect()->route('login.intent')
+        return redirect()->route('login')
             ->withErrors(['email' => 'Invalid login attempt.']);
     }
 }

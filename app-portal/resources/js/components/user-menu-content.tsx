@@ -93,12 +93,12 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
                             replace: true, // Replace history entry instead of adding new one
                             onSuccess: () => {
                                 // Force full page reload to clear all state
-                                window.location.href = route('login.intent');
+                                window.location.href = route('login');
                             },
                             onError: (errors) => {
                                 console.error('Logout failed:', errors);
                                 // Fallback: force navigation even on error
-                                window.location.href = route('login.intent');
+                                window.location.href = route('login');
                             }
                         });
                     }}

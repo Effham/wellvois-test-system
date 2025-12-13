@@ -29,15 +29,13 @@ interface LoginProps {
 }
 
 export default function Login({ status, canResetPassword, tenant, intent }: LoginProps) {
-    // Redirect to intent selector if no intent is provided
+    // Admin portal doesn't use intent-based login - redirect to admin login
     useEffect(() => {
-        if (!intent || (intent !== 'practitioner' && intent !== 'patient')) {
-            router.visit(route('login.intent'), {
-                preserveState: false,
-                preserveScroll: false,
-            });
-        }
-    }, [intent]);
+        router.visit(route('admin.login'), {
+            preserveState: false,
+            preserveScroll: false,
+        });
+    }, []);
     const { data, setData, post, processing, errors, reset } = useForm<Required<LoginForm>>({
         email: '',
         password: '',
@@ -178,13 +176,6 @@ export default function Login({ status, canResetPassword, tenant, intent }: Logi
 
                         {/* Footer Links */}
                         <div className="mt-4 sm:mt-5 flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-0">
-                            <TextLink 
-                                href={route('login.intent')} 
-                                className="text-sm font-medium text-purple-600 hover:text-purple-700 no-underline"
-                                tabIndex={5}
-                            >
-                                ← Back to Login Options
-                            </TextLink>
                             {canResetPassword && (
                                 <TextLink 
                                     href={route('password.request')} 

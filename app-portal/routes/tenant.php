@@ -63,7 +63,7 @@ use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 Route::middleware([
     'web',
     InitializeTenancyByDomain::class,
-    // PreventAccessFromCentralDomains::class,
+    PreventAccessFromCentralDomains::class, // Enable this to prevent tenant routes on central domains
 ])->group(function () {
     // Route::get('/', function () {
     //     dd(\App\Models\User::all());
@@ -377,7 +377,7 @@ Route::middleware([
     // API endpoint for real-time patient invitation statuses
 
     Route::get('/', function () {
-        return redirect()->route('login.intent');
+        return redirect()->route('login');
     })->name('home');
 
     // Patient Dashboard Route - Accessible without auth for public portal auto-login
@@ -1567,16 +1567,14 @@ Route::middleware([
         }
     })->name('profile-picture.proxy');
 
-    Route::get('/login', function (Request $request) {
-        $centralLoginUrl = centralUrl('/login');
-
-        // Forward query parameters to central login (e.g., intended URL, document access token)
-        if ($request->getQueryString()) {
-            $centralLoginUrl .= '?'.$request->getQueryString();
-        }
-
-        return Inertia::location($centralLoginUrl);
-    })->name('login');
+    // Tenant-specific login route - each tenant has its own login screen
+    Route::middleware('guest')->group(function () {
+        Route::get('/login', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'createTenant'])
+            ->name('login');
+        
+        Route::post('/login', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'storeTenant'])
+            ->name('login');
+    });
 
 });
 

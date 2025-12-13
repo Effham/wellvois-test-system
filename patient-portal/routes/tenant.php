@@ -60,10 +60,13 @@ use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 |
 */
 
+// Patient portal is central-only - no tenant routes
+// Tenant routes disabled for patient-portal
+/*
 Route::middleware([
     'web',
     InitializeTenancyByDomain::class,
-    // PreventAccessFromCentralDomains::class,
+    PreventAccessFromCentralDomains::class,
 ])->group(function () {
     // Route::get('/', function () {
     //     dd(\App\Models\User::all());
@@ -1719,9 +1722,9 @@ Route::middleware([
         Route::delete('/{entityConsent}', [App\Http\Controllers\Tenant\EntityConsentController::class, 'destroy'])->name('destroy');
         Route::post('/{id}/restore', [App\Http\Controllers\Tenant\EntityConsentController::class, 'restore'])->name('restore');
     });
-});
 
-// Website Settings API Routes (for admin)
+// Website Settings API Routes (for admin) - DISABLED: patient-portal is central-only
+/*
 Route::middleware(['web', InitializeTenancyByDomain::class, 'auth'])
     ->prefix('api/website-settings')
     ->name('api.website-settings.')
@@ -1745,6 +1748,7 @@ Route::middleware(['web', InitializeTenancyByDomain::class])
         Route::get('/cancel', [App\Http\Controllers\Tenant\MarketplacePaymentController::class, 'cancel'])->name('cancel');
         Route::get('/status/{paymentIntentId}', [App\Http\Controllers\Tenant\MarketplacePaymentController::class, 'status'])->name('status');
     });
+*/ // End of disabled tenant routes for patient-portal (central-only)
 // __DIR__.'/diagnostic-routes.php';
 
 Route::get('/diagnostic-error', function () {
