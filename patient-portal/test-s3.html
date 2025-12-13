@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>S3 Private Upload Tester</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --accent:#22d3ee; --ok:#34d399; --err:#f87171; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background: var(--bg); color: #e5e7eb; }
+    .wrap { max-width: 900px; margin: 40px auto; padding: 0 16px; }
+    h1 { font-size: 1.6rem; margin: 0 0 20px; }
+    .card { background: var(--card); border: 1px solid #1f2937; border-radius: 16px; padding: 16px; margin: 18px 0; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display: block; font-size: .9rem; color: var(--muted); margin-bottom: 6px; }
+    input[type="text"], input[type="number"] { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #374151; background: #0b1220; color: #e5e7eb; }
+    input[type="file"] { width: 100%; }
+    button { padding: 10px 14px; border-radius: 10px; border: 1px solid #334155; background: #0b1220; color: #e5e7eb; cursor: pointer; }
+    button.primary { background: linear-gradient(135deg,#22d3ee,#3b82f6); border: none; color: #031226; font-weight: 600; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .hint { font-size: .85rem; color: var(--muted); margin-top: 8px; }
+    .out { background: #0b1220; border: 1px dashed #334155; border-radius: 12px; padding: 12px; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
+    .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: .75rem; margin-left: 8px; }
+    .ok { background: #052e29; color: var(--ok); border: 1px solid #115e59; }
+    .err { background: #3b0a0a; color: var(--err); border: 1px solid #7f1d1d; }
+    .flex { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    a.button-link { text-decoration: none; }
+    .copy { font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>S3 Private Upload Tester</h1>
+
+    <!-- Config -->
+    <div class="card">
+      <h2 style="margin-top:0;">Target API</h2>
+      <div class="row">
+        <div>
+          <label>Base URL (change if needed)</label>
+          <input id="baseUrl" type="text" value="http://localhost:8000" />
+          <div class="hint">If your Laravel app runs elsewhere (Docker port, domain), update this.</div>
+        </div>
+        <div>
+          <label>Upload Endpoint</label>
+          <input id="uploadPath" type="text" value="/api/storage/upload" />
+          <div class="hint">POST (multipart/form-data)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div class="card">
+      <h2 style="margin-top:0;">1) Upload a File (Private)</h2>
+      <div class="row">
+        <div>
+          <label>File</label>
+          <input id="file" type="file" />
+        </div>
+        <div>
+          <label>Custom S3 Key (optional)</label>
+          <input id="key" type="text" placeholder="e.g. c/downloads/filename.png" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <div>
+          <label>Signed URL expires (minutes)</label>
+          <input id="expires" type="number" value="15" min="1" max="1440" />
+        </div>
+        <div class="flex" style="align-self:end; justify-content:flex-end;">
+          <button id="btnUpload" class="primary">Upload</button>
+        </div>
+      </div>
+      <div id="uploadStatus" class="hint"></div>
+      <div id="uploadOut" class="out" style="margin-top:10px;"></div>
+      <div id="uploadLinks" class="flex" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- Signed URL fetch -->
+    <div class="card">
+      <h2 style="margin-top:0;">2) Get a Fresh Signed URL for an Existing Key</h2>
+      <div class="row">
+        <div>
+          <label>S3 Key</label>
+          <input id="suKey" type="text" placeholder="c/downloads/filename.png" />
+        </div>
+        <div>
+          <label>Expires (minutes)</label>
+          <input id="suMinutes" type="number" value="10" min="1" max="1440" />
+        </div>
+      </div>
+      <div class="flex" style="margin-top:12px; justify-content:flex-end;">
+        <button id="btnSignedUrl">Get Signed URL</button>
+      </div>
+      <div id="suStatus" class="hint"></div>
+      <div id="suOut" class="out" style="margin-top:10px;"></div>
+      <div id="suLinks" class="flex" style="margin-top:8px;"></div>
+    </div>
+
+    <!-- Streamed download -->
+    <div class="card">
+      <h2 style="margin-top:0;">3) Stream Download via Laravel Route</h2>
+      <div class="row">
+        <div>
+          <label>Download Route (GET)</label>
+          <input id="dlPath" type="text" value="/api/storage/download" />
+          <div class="hint">Will request: <code>{baseUrl}{dlPath}/{key}</code></div>
+        </div>
+        <div>
+          <label>S3 Key</label>
+          <input id="dlKey" type="text" placeholder="c/downloads/filename.png" />
+        </div>
+      </div>
+      <div class="flex" style="margin-top:12px; justify-content:flex-end;">
+        <a id="dlLink" class="button-link" target="_blank" rel="noopener">
+          <button>Open Download URL</button>
+        </a>
+      </div>
+      <div class="hint">This hits your Laravel controller’s <code>streamResponse()</code>. Good for protected access.</div>
+    </div>
+
+    <div class="card">
+      <div class="hint">
+        Tip: If you secured these routes (e.g., Sanctum/JWT), you’ll need to attach auth headers in the JS fetch calls.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const qs = id => document.getElementById(id);
+    const baseUrlEl = qs('baseUrl');
+    const uploadPathEl = qs('uploadPath');
+    const fileEl = qs('file');
+    const keyEl = qs('key');
+    const expiresEl = qs('expires');
+    const btnUpload = qs('btnUpload');
+    const uploadStatus = qs('uploadStatus');
+    const uploadOut = qs('uploadOut');
+    const uploadLinks = qs('uploadLinks');
+
+    const suKeyEl = qs('suKey');
+    const suMinutesEl = qs('suMinutes');
+    const btnSignedUrl = qs('btnSignedUrl');
+    const suStatus = qs('suStatus');
+    const suOut = qs('suOut');
+    const suLinks = qs('suLinks');
+
+    const dlPathEl = qs('dlPath');
+    const dlKeyEl = qs('dlKey');
+    const dlLink = qs('dlLink');
+
+    function fullUrl(path) {
+      const b = baseUrlEl.value.replace(/\/+$/, '');
+      const p = path.startsWith('/') ? path : '/' + path;
+      return b + p;
+    }
+
+    function setPill(el, text, ok = true) {
+      el.innerHTML = '';
+      const pill = document.createElement('span');
+      pill.className = 'pill ' + (ok ? 'ok' : 'err');
+      pill.textContent = text;
+      el.appendChild(pill);
+    }
+
+    function copyButton(text) {
+      const btn = document.createElement('button');
+      btn.textContent = 'Copy';
+      btn.className = 'copy';
+      btn.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1200); } catch {}
+      });
+      return btn;
+    }
+
+    btnUpload.addEventListener('click', async () => {
+      uploadOut.textContent = '';
+      uploadLinks.innerHTML = '';
+      if (!fileEl.files || !fileEl.files[0]) {
+        uploadOut.textContent = 'Please choose a file first.';
+        setPill(uploadStatus, 'Missing file', false);
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('file', fileEl.files[0]);
+      const k = keyEl.value.trim();
+      if (k) fd.append('key', k);
+      const mins = Number(expiresEl.value || 10);
+      if (mins) fd.append('expires_minutes', String(mins));
+
+      const url = fullUrl(uploadPathEl.value);
+      btnUpload.disabled = true;
+      setPill(uploadStatus, 'Uploading...');
+
+      try {
+        const res = await fetch(url, { method: 'POST', body: fd });
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = { raw: text }; }
+
+        uploadOut.textContent = JSON.stringify(json, null, 2);
+
+        if (res.ok) {
+          setPill(uploadStatus, 'Upload OK');
+          if (json.signed_url) {
+            const a = document.createElement('a');
+            a.href = json.signed_url;
+            a.target = '_blank';
+            a.rel = 'noopener';
+            a.textContent = 'Open Signed URL';
+            a.className = 'button-link';
+            const openBtn = document.createElement('button');
+            openBtn.className = 'primary';
+            openBtn.textContent = 'Open Signed URL';
+            a.appendChild(openBtn);
+
+            const copy = copyButton(json.signed_url);
+            uploadLinks.appendChild(a);
+            uploadLinks.appendChild(copy);
+          }
+          if (json.key) {
+            dlKeyEl.value = json.key;
+            suKeyEl.value = json.key;
+          }
+        } else {
+          setPill(uploadStatus, 'Upload Failed', false);
+        }
+      } catch (e) {
+        setPill(uploadStatus, 'Network Error', false);
+        uploadOut.textContent = String(e);
+      } finally {
+        btnUpload.disabled = false;
+      }
+    });
+
+    btnSignedUrl.addEventListener('click', async () => {
+      suOut.textContent = '';
+      suLinks.innerHTML = '';
+      const key = suKeyEl.value.trim();
+      if (!key) {
+        suOut.textContent = 'Enter a key.';
+        setPill(suStatus, 'Missing key', false);
+        return;
+      }
+      const mins = Number(suMinutesEl.value || 10);
+      const url = fullUrl('/api/storage/signed-url') + `?key=${encodeURIComponent(key)}&expires_minutes=${encodeURIComponent(mins)}`;
+
+      setPill(suStatus, 'Requesting...');
+      try {
+        const res = await fetch(url);
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); } catch { json = { raw: text }; }
+        suOut.textContent = JSON.stringify(json, null, 2);
+
+        if (res.ok && json.url) {
+          setPill(suStatus, 'OK');
+          const a = document.createElement('a');
+          a.href = json.url;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.textContent = 'Open Signed URL';
+          a.className = 'button-link';
+          const openBtn = document.createElement('button');
+          openBtn.className = 'primary';
+          openBtn.textContent = 'Open Signed URL';
+          a.appendChild(openBtn);
+
+          const copy = copyButton(json.url);
+          suLinks.appendChild(a);
+          suLinks.appendChild(copy);
+        } else {
+          setPill(suStatus, 'Failed', false);
+        }
+      } catch (e) {
+        setPill(suStatus, 'Network Error', false);
+        suOut.textContent = String(e);
+      }
+    });
+
+    // Update the download link on input
+    function refreshDownloadLink() {
+      const key = dlKeyEl.value.trim();
+      const href = fullUrl(dlPathEl.value.replace(/\/+$/, '')) + '/' + encodeURI(key);
+      dlLink.href = href;
+    }
+    dlPathEl.addEventListener('input', refreshDownloadLink);
+    dlKeyEl.addEventListener('input', refreshDownloadLink);
+    baseUrlEl.addEventListener('input', refreshDownloadLink);
+    refreshDownloadLink();
+  </script>
+</body>
+</html>

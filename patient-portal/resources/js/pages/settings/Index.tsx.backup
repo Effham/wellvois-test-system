@@ -1,0 +1,855 @@
+import { type BreadcrumbItem } from '@/types';
+import { Head, usePage, router } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Users, Send } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
+import { Settings, CheckCircle } from 'lucide-react';
+import SettingsWalkthrough from '@/components/SettingsWalkthrough';
+import PractitionerIndex from '../Practitioner/Index';
+import InvitationsTable from '../Practitioner/InvitationsTable';
+import PractitionerCreate from '../Practitioner/Create';
+import ServicesIndex from '../Services/Index';
+import ServicesCreate from '../Services/Create';
+import PracticeDetails from './Organization/PracticeDetails';
+import Appearance from './Organization/Appearance';
+import TimeLocale from './Organization/TimeLocale';
+import BusinessCompliance from './Organization/BusinessCompliance';
+import BasicInfo from './Location/BasicInfo';
+import OperatingHours from './Location/OperatingHours';
+import PractitionersTab from './Location/PractitionersTab';
+import AllLocations from './Location/AllLocations';
+import AppointmentSettings from './Appointments/AppointmentSettings';
+import IntegrationsTab from './Integrations/IntegrationsTab';
+import WebsiteNavigationSettings from '@/components/WebsiteNavigationSettings';
+import WebsiteLayoutSettings from '@/components/WebsiteLayoutSettings';
+import WebsiteAppearanceSettings from '@/components/WebsiteAppearanceSettings';
+
+const breadcrumbs: BreadcrumbItem[] = [
+    {
+        title: 'Settings',
+        href: '/settings',
+    },
+];
+
+interface TabOption {
+    value: string;
+    label: string;
+}
+
+interface SidebarNavItem {
+    title: string;
+    key: string;
+    hasTable?: boolean;
+    tabs?: TabOption[];
+    permission?: string;
+    hasAllView?: boolean;
+}
+
+type Practitioner = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    title?: string;
+    phone_number?: string;
+    gender?: string;
+    pronoun?: string;
+    email: string;
+    short_bio?: string;
+    full_bio?: string;
+    invitation_status?: string;
+};
+
+interface OrganizationSettings {
+    practiceDetails: Record<string, string>;
+    appearance: Record<string, string>;
+    timeLocale: Record<string, string>;
+    businessCompliance: Record<string, string>;
+}
+
+const sidebarNavItems: SidebarNavItem[] = [
+    {
+        title: 'Organization',
+        key: 'organization',
+        tabs: [
+            { value: 'practice-details', label: 'Practice Details' },
+            { value: 'appearance-time', label: 'Appearance' },
+            { value: 'locale', label: ' Time & Locale' },
+            { value: 'business-compliance', label: 'Business & Compliance' },
+            { value: 'appointment-settings', label: 'Appointment Settings' },
+        ],
+    },
+    {
+        title: 'Locations',
+        key: 'locations',
+        tabs: [
+            { value: 'basic-info', label: 'Basic Info' },
+            { value: 'operating-hours', label: 'Operating Hours' },
+            { value: 'practitioners', label: 'Practitioners' },
+        ],
+        hasAllView: true,
+    },
+    {
+        title: 'Practitioners',
+        key: 'practitioners',
+        hasTable: true,
+        permission: 'view-practitioner',
+    },
+    {
+        title: 'Services',
+        key: 'services',
+        hasTable: true,
+        permission: 'view-services',
+    },
+    {
+        title: 'Integrations',
+        key: 'integrations',
+        hasTable: false,
+        permission: 'view-integration',
+    },
+    {
+        title: 'Website Settings',
+        key: 'website',
+        tabs: [
+            { value: 'navigation', label: 'Navigation Menu' },
+        ],
+    },
+];
+
+export default function SettingsIndex({ 
+    practitioners, 
+    invitations,
+    filters, 
+    currentTab, 
+    organizationSettings,
+    locations,
+    services,
+    editPractitioner,
+    appointmentSettings,
+    integrations
+}: { 
+    practitioners?: any; 
+    invitations?: any;
+    filters?: any; 
+    currentTab?: string;
+    organizationSettings?: OrganizationSettings;
+    locations?: any;
+    services?: any;
+    editPractitioner?: any;
+    appointmentSettings?: any;
+    integrations?: any;
+}) {
+    const { auth, tenancy, flash }: any = usePage()?.props || {};
+    const userPerms: string[] = auth?.user?.permissions || [];
+    
+    // Determine initial active section based on URL parameters or currentTab prop
+    const getInitialSection = () => {
+        // Check URL parameters first (only on client-side)
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            const sectionParam = urlParams.get('section');
+            
+            if (sectionParam && ['organization', 'locations', 'practitioners', 'services', 'integrations', 'website'].includes(sectionParam)) {
+                return sectionParam;
+            }
+        }
+        
+        // Fallback to currentTab prop  
+        if (currentTab && currentTab === 'practitioners') {
+            return 'practitioners';
+        }
+        if (currentTab && ['organization', 'locations', 'services', 'integrations'].includes(currentTab)) {
+            return currentTab;
+        }
+        return 'organization';
+    };
+    
+    const [activeSection, setActiveSection] = useState(getInitialSection());
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [editingPractitioner, setEditingPractitioner] = useState<Practitioner | null>(null);
+    const [showFlash, setShowFlash] = useState(true);
+    
+    // Services state management
+    const [showServicesCreateForm, setShowServicesCreateForm] = useState(false);
+    const [editingService, setEditingService] = useState<any>(null);
+    
+    // Location state management
+    const [selectedLocation, setSelectedLocation] = useState<any>(null);
+    const [showLocationForm, setShowLocationForm] = useState(false);
+    const [locationViewMode, setLocationViewMode] = useState<'all' | 'edit'>('all');
+    
+    // Walkthrough state management
+    const [showWalkthrough, setShowWalkthrough] = useState(false);
+
+    // Watch for currentTab changes and update active section
+    useEffect(() => {
+        if (currentTab && currentTab === 'practitioners') {
+            setActiveSection('practitioners');
+            // Clear subtab when switching to practitioners section (client-side only)
+            if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                if (url.searchParams.has('subtab')) {
+                    url.searchParams.delete('subtab');
+                    window.history.replaceState({}, '', url.pathname + url.search);
+                }
+            }
+        } else if (currentTab && ['organization', 'locations', 'services'].includes(currentTab)) {
+            setActiveSection(currentTab);
+            // Keep subtab for organization section, clear for others (client-side only)
+            if (currentTab !== 'organization' && typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                if (url.searchParams.has('subtab')) {
+                    url.searchParams.delete('subtab');
+                    window.history.replaceState({}, '', url.pathname + url.search);
+                }
+            }
+        }
+        }, [currentTab, userPerms]);
+
+    // Handle URL parameters for location and practitioner redirects
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const sectionParam = urlParams.get('section');
+        const locationId = urlParams.get('location');
+        const practitionerId = urlParams.get('practitioner_id');
+        const subtab = urlParams.get('subtab');
+        
+        // If there's a location parameter and we're in the locations section
+        if (sectionParam === 'locations' && locationId && locations?.data) {
+            const location = locations.data.find((loc: any) => loc?.id === parseInt(locationId));
+            if (location) {
+                setActiveSection('locations');
+                setSelectedLocation(location);
+                setLocationViewMode('edit');
+                setShowLocationForm(true);
+            }
+        }
+        
+        // If there's a practitioner_id parameter and we're in the practitioners section
+        if (sectionParam === 'practitioners' && practitionerId && editPractitioner) {
+            setActiveSection('practitioners');
+            setEditingPractitioner(editPractitioner);
+            setShowCreateForm(true);
+        }
+    }, [locations?.data, editPractitioner]);
+
+    // Auto-hide flash messages after 5 seconds and update URL if activeTab is present
+    useEffect(() => {
+        if (flash?.success || flash?.error) {
+            setShowFlash(true);
+            
+            // If flash has activeTab, update URL to reflect it (client-side only)
+            if (flash?.activeTab && typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                url.searchParams.set('subtab', flash.activeTab);
+                // Use replaceState to avoid creating a new history entry
+                window.history.replaceState({}, '', url.pathname + url.search);
+            }
+            
+            const timer = setTimeout(() => {
+                setShowFlash(false);
+            }, 5000);
+            return () => clearTimeout(timer);
+        }
+    }, [flash]);
+
+    // Check for walkthrough URL parameter
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const shouldShowWalkthrough = urlParams.get('walkthrough') === 'true';
+        
+        if (shouldShowWalkthrough) {
+            setShowWalkthrough(true);
+            // Clean up URL parameter
+            const newUrl = new URL(window.location.href);
+            newUrl.searchParams.delete('walkthrough');
+            window.history.replaceState({}, '', newUrl.pathname + newUrl.search);
+        }
+    }, []);
+
+
+
+    // Filter sidebar items based on permissions
+    const filteredSidebarNavItems = sidebarNavItems.filter(item => {
+        if (!item?.permission) return true;
+        return userPerms?.includes(item.permission) || false;
+    });
+
+    // Helper function to get the correct grid class based on tab count
+    const getGridCols = (tabCount: number) => {
+        switch (tabCount) {
+            case 1:
+                return 'grid-cols-1';
+            case 2:
+                return 'grid-cols-2';
+            case 3:
+                return 'grid-cols-3';
+            case 4:
+                return 'grid-cols-4';
+            case 5:
+                return 'grid-cols-5';
+            case 6:
+                return 'grid-cols-6';
+            default:
+                return 'grid-cols-1';
+        }
+    };
+
+    const handleCreatePractitioner = () => {
+        setEditingPractitioner(null);
+        setShowCreateForm(true);
+    };
+
+    const handleEditPractitioner = (practitioner: Practitioner) => {
+        setEditingPractitioner(practitioner);
+        setShowCreateForm(true);
+    };
+
+    const handleCreateService = () => {
+        setEditingService(null);
+        setShowServicesCreateForm(true);
+    };
+
+    const handleEditService = (service: any) => {
+        setEditingService(service);
+        setShowServicesCreateForm(true);
+    };
+
+    const handleCancelServiceForm = () => {
+        setShowServicesCreateForm(false);
+        setEditingService(null);
+    };
+
+    const handleCancelPractitionerForm = () => {
+        setShowCreateForm(false);
+        setEditingPractitioner(null);
+        
+        // Clean up URL parameters when canceling edit (client-side only)
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('practitioner_id')) {
+                url.searchParams.delete('practitioner_id');
+                window.history.replaceState({}, '', url.pathname + url.search);
+            }
+        }
+    };
+
+    const handleWalkthroughNavigation = (section: string, subtab?: string) => {
+        // Update the active section
+        setActiveSection(section);
+        
+        // Update URL with section and subtab parameters (client-side only)
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.set('section', section);
+            if (subtab) {
+                url.searchParams.set('subtab', subtab);
+            } else {
+                url.searchParams.delete('subtab');
+            }
+            
+            // Navigate with Inertia to update URL and preserve state
+            router.get(url.pathname + url.search, {}, { 
+                preserveState: true,
+                preserveScroll: true,
+                only: ['flash']
+            });
+        }
+    };
+
+    const renderPractitionerContent = () => {
+        if (showCreateForm) {
+            return (
+                <div className="space-y-6">
+                    <PractitionerCreate
+                        practitioner={editingPractitioner}
+                        locations={locations}
+                        services={services}
+                        onCancel={handleCancelPractitionerForm}
+                        canEditBasicInfo={(editingPractitioner as any)?.canEditBasicInfo ?? true}
+                        canEditProfessionalDetails={(editingPractitioner as any)?.canEditProfessionalDetails ?? true}
+                    />
+                </div>
+            );
+        }
+
+        return (
+            <Card className="border-none shadow-none">
+
+                <CardContent>
+                    <Tabs defaultValue="practitioners" className="w-full">
+                        <div className="pb-4">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="practitioners" className="flex items-center space-x-2">
+                                    <Users className="h-4 w-4" />
+                                    <span>Practitioners</span>
+                                </TabsTrigger>
+                                <TabsTrigger value="invitations" className="flex items-center space-x-2">
+                                    <Send className="h-4 w-4" />
+                                    <span>Invitations</span>
+                                </TabsTrigger>
+                            </TabsList>
+                        </div>
+
+                        <TabsContent value="practitioners" className="mt-0">
+                            <PractitionerIndex
+                                standalone={false}
+                                practitioners={practitioners || {}}
+                                filters={filters || {}}
+                                onCreateClick={handleCreatePractitioner}
+                                onEditClick={handleEditPractitioner}
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="invitations" className="mt-0">
+                            <InvitationsTable 
+                                standalone={false}
+                                invitations={invitations || {}}
+                                filters={filters || {}}
+                            />
+                        </TabsContent>
+                    </Tabs>
+                </CardContent>
+            </Card>
+        );
+    };
+
+    const renderServicesContent = () => {
+        if (showServicesCreateForm) {
+            // Provide the default options for services create form
+            const categories = {
+                'Individual': 'Individual',
+                'Couple': 'Couple',
+                'Group': 'Group', 
+                'Assessment': 'Assessment',
+                'Family': 'Family',
+                'Specialty': 'Specialty',
+                'Follow-Up': 'Follow-Up',
+            };
+            
+            const deliveryModes = {
+                'in-person': 'In-Person',
+                'virtual': 'Virtual',
+            };
+            
+            const durations = {
+                15: '15 minutes',
+                30: '30 minutes',
+                45: '45 minutes',
+                60: '60 minutes',
+                75: '75 minutes',
+                90: '90 minutes',
+                120: '2 hours',
+                150: '2.5 hours',
+                180: '3 hours',
+            };
+
+            return (
+                <ServicesCreate
+                    service={editingService}
+                    categories={categories}
+                    deliveryModes={deliveryModes}
+                    onCancel={handleCancelServiceForm}
+                />
+            );
+        }
+
+        return (
+            <ServicesIndex
+                onCreateClick={handleCreateService}
+                onEditClick={handleEditService}
+                services={services || {}}
+                filters={filters || {}}
+            />
+        );
+    };
+
+    const renderTableContent = () => {
+        if (activeSection === 'practitioners') {
+            return renderPractitionerContent();
+        }
+
+        if (activeSection === 'services') {
+            return renderServicesContent();
+        }
+
+        return (
+            <div className="space-y-6">
+                <div className="space-y-2">
+                    <h2 className="text-2xl font-bold tracking-tight capitalize">{activeSection}</h2>
+                    <p className="text-muted-foreground">Manage your {activeSection} and their information.</p>
+                </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{activeSection} Management</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-muted-foreground">View and manage all {activeSection.toLowerCase()} in your organization.</p>
+                                <Button>Add {activeSection.slice(0, -1)}</Button>
+                            </div>
+
+                            <div className="rounded-lg border p-4">
+                                <p className="text-muted-foreground py-8 text-center">{activeSection} table will be implemented here</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    };
+
+    const renderTabComponent = (tabValue: string) => {
+        // Provide default empty objects if organizationSettings is undefined
+        const defaultSettings = {
+            practiceDetails: {},
+            appearance: {},
+            timeLocale: {},
+            businessCompliance: {},
+        };
+        
+        const settings = organizationSettings || defaultSettings;
+
+        switch (tabValue) {
+            // Organization tabs
+            case 'practice-details':
+                return <PracticeDetails 
+                    practiceDetailsSettings={settings.practiceDetails} 
+                    tenantName={tenancy?.current?.name || ''} 
+                />;
+            case 'appearance-time':
+                return <Appearance 
+                    appearanceSettings={settings.appearance} 
+                    tenantName={tenancy?.current?.name || ''} 
+                />;
+            case 'locale':
+                return <TimeLocale timeLocaleSettings={settings.timeLocale} />;
+            case 'business-compliance':
+                return <BusinessCompliance businessComplianceSettings={settings.businessCompliance} />;
+            
+            // Appointment tabs
+            case 'appointment-settings':
+                return <AppointmentSettings appointmentSettings={appointmentSettings || {}} />;
+            
+            // Location tabs
+            case 'basic-info':
+                return <BasicInfo 
+                    location={selectedLocation}
+                    timezones={locations?.timezones || []}
+                    provinces={locations?.provinces || []}
+                    cities={locations?.cities || {}}
+                    onSave={(location) => {
+                        setSelectedLocation(location);
+                        // Optionally refresh locations list
+                    }}
+                />;
+            case 'operating-hours':
+                return <OperatingHours 
+                    location={selectedLocation}
+                    onSave={(operatingHours) => {
+                        // Update the selected location with new operating hours
+                        if (selectedLocation) {
+                            setSelectedLocation({
+                                ...selectedLocation,
+                                operating_hours: operatingHours
+                            });
+                        }
+                    }}
+                />;
+            case 'practitioners':
+                return <PractitionersTab 
+                    location={selectedLocation}
+                    practitioners={selectedLocation?.practitioners || []}
+                    onSave={(practitioners) => {
+                        // Update the selected location with new practitioners
+                        if (selectedLocation) {
+                            setSelectedLocation({
+                                ...selectedLocation,
+                                practitioners: practitioners
+                            });
+                        }
+                    }}
+                />;
+            
+            // Website Settings tabs
+            case 'navigation':
+                return <WebsiteNavigationSettings />;
+            
+            default:
+                return <PracticeDetails 
+                    practiceDetailsSettings={settings.practiceDetails} 
+                    tenantName={tenancy?.current?.name || ''} 
+                />;
+        }
+    };
+
+    const renderTabContent = (currentItem: SidebarNavItem) => {
+        // Special handling for locations section
+        if (currentItem.key === 'locations') {
+            if (locationViewMode === 'all') {
+                return (
+                    <AllLocations 
+                        locations={locations?.data || []}
+                        onAddLocation={() => {
+                            setSelectedLocation(null);
+                            setLocationViewMode('edit');
+                            
+                            // Update URL for new location (without location ID) (client-side only)
+                            if (typeof window !== 'undefined') {
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('section', 'locations');
+                                url.searchParams.set('subtab', 'basic-info');
+                                url.searchParams.delete('location'); // Remove location param for new location
+                                
+                                router.get(url.pathname + url.search, {}, { 
+                                    preserveState: true,
+                                    preserveScroll: true,
+                                    only: ['flash']
+                                });
+                            }
+                        }}
+                        onEditLocation={(location) => {
+                            setSelectedLocation(location);
+                            setLocationViewMode('edit');
+                            
+                            // Update URL with location parameter (client-side only)
+                            if (typeof window !== 'undefined') {
+                                const url = new URL(window.location.href);
+                                url.searchParams.set('section', 'locations');
+                                url.searchParams.set('location', location.id.toString());
+                                url.searchParams.set('subtab', 'basic-info'); // Default to basic info tab
+                                
+                                router.get(url.pathname + url.search, {}, { 
+                                    preserveState: true,
+                                    preserveScroll: true,
+                                    only: ['flash']
+                                });
+                            }
+                        }}
+                    />
+                );
+            }
+        }
+
+        const tabs = currentItem.tabs || [];
+        
+        // Get current URL parameters (client-side only)
+        let currentSubtab = null;
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            currentSubtab = urlParams.get('subtab');
+        }
+        
+        // Determine default tab: URL parameter > flash.activeTab > first tab
+        const defaultTab = currentSubtab || flash?.activeTab || (tabs.length > 0 ? tabs[0].value : 'practice-details');
+
+        // Handle tab change and update URL
+        const handleTabChange = (value: string) => {
+            if (typeof window === 'undefined') return;
+            
+            const url = new URL(window.location.href);
+            url.searchParams.set('subtab', value);
+            
+            // Include location ID for location tabs
+            if (currentItem.key === 'locations' && selectedLocation?.id) {
+                url.searchParams.set('location', selectedLocation.id.toString());
+            }
+            
+            router.get(url.pathname + url.search, {}, { 
+                preserveState: true,
+                preserveScroll: true,
+                only: ['flash'] // Only reload flash data, not the whole page
+            });
+        };
+
+        return (
+            <div className="space-y-6">
+                {/* Back button for location edit mode */}
+                {currentItem.key === 'locations' && locationViewMode === 'edit' && (
+                    <div className="flex items-center justify-between px-6 py-4 border-b">
+                        <div className="flex items-center space-x-4">
+                            <Button
+                                variant="ghost"
+                                onClick={() => {
+                                    setLocationViewMode('all');
+                                    setSelectedLocation(null);
+                                    
+                                    // Update URL to remove location and subtab parameters (client-side only)
+                                    if (typeof window !== 'undefined') {
+                                        const url = new URL(window.location.href);
+                                        url.searchParams.set('section', 'locations');
+                                        url.searchParams.delete('subtab');
+                                        url.searchParams.delete('location');
+                                        
+                                        router.get(url.pathname + url.search, {}, { 
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                            only: ['flash']
+                                        });
+                                    }
+                                }}
+                                className="text-gray-600 hover:text-gray-800"
+                            >
+                                ← Back 
+                            </Button>
+                            <div>
+                                <h3 className="text-lg font-semibold">
+                                    {selectedLocation ? `Edit ${selectedLocation.name}` : ''}
+                                </h3>
+                                <p className="text-sm text-gray-500">
+                                    {selectedLocation ? 'Update location information and settings' : ''}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <Card className="border-none shadow-none">
+                    <Tabs defaultValue={defaultTab} onValueChange={handleTabChange} className="w-full">
+                        <div className="px-6 pb-0">
+                            <TabsList className={`grid w-full ${getGridCols(tabs.length)}`}>
+                            {tabs.map((tab) => (
+                                <TabsTrigger 
+                                    key={tab.value} 
+                                    value={tab.value}
+                                    className=" data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:font-bold data-[state=inactive]:bg-transparent data-[state=inactive]:text-gray-800"
+                                >
+                                    {tab.label}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                        </div>
+
+                        {tabs.map((tab) => (
+                            <TabsContent key={tab.value} value={tab.value} className="mt-0">
+                                {/* Flash Message */}
+                                {showFlash && flash?.success && (
+                                    <div className="px-6 pt-4">
+                                        <Alert className="bg-green-50 border-green-200">
+                                            <CheckCircle className="h-4 w-4 text-green-600" />
+                                            <AlertDescription className="text-green-800">
+                                                {flash.success}
+                                            </AlertDescription>
+                                        </Alert>
+                                    </div>
+                                )}
+                                {showFlash && flash?.error && (
+                                    <div className="px-6 pt-4">
+                                        <Alert className="bg-red-50 border-red-200">
+                                            <AlertDescription className="text-red-800">
+                                                {flash.error}
+                                            </AlertDescription>
+                                        </Alert>
+                                    </div>
+                                )}
+                                {renderTabComponent(tab.value)}
+                            </TabsContent>
+                        ))}
+                    </Tabs>
+                </Card>
+            </div>
+        );
+    };
+
+    const renderContent = () => {
+        const currentItem = filteredSidebarNavItems.find((item) => item.key === activeSection);
+
+        if (!currentItem) return null;
+
+        // Special handling for integrations section
+        if (currentItem?.key === 'integrations') {
+            return <IntegrationsTab integrations={integrations || { data: [], stats: { total: 0, connected: 0, calendar: 0, payment: 0, communication: 0 } }} />;
+        }
+
+        if (currentItem?.hasTable) {
+            return renderTableContent();
+        }
+
+        return renderTabContent(currentItem);
+    };
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Settings" />
+
+            <div className="px-4 py-6">
+                <div className="flex flex-col space-y-8 lg:flex-row lg:space-y-0 lg:space-x-12">
+                    <aside className="w-full max-w-xl lg:w-48">
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3">
+                                <Settings className="h-6 w-6 text-primary" />
+                                <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+                            </div>
+                            <nav className="flex flex-col space-y-1 space-x-0">
+                                {filteredSidebarNavItems.map((item) => (
+                                    <Button
+                                        key={item.key}
+                                                                                size="sm"
+                                        variant="ghost"
+                                        onClick={() => {
+                                            // Update URL with section parameter (client-side only)
+                                            if (typeof window !== 'undefined') {
+                                                const url = new URL(window.location.href);
+                                                url.searchParams.set('section', item.key);
+                                                
+                                                // Clear subtab and location parameters when switching sections
+                                                url.searchParams.delete('subtab');
+                                                url.searchParams.delete('location');
+                                                
+                                                // Navigate with Inertia to update URL and preserve state
+                                                router.get(url.pathname + url.search, {}, { 
+                                                    preserveState: true,
+                                                    preserveScroll: true,
+                                                    only: ['flash']
+                                                });
+                                            }
+                                            
+                                            setActiveSection(item.key);
+                                            
+                                            // Reset location view mode when switching to locations
+                                            if (item.key === 'locations') {
+                                                setLocationViewMode('all');
+                                                setSelectedLocation(null);
+                                            }
+                                        }}
+                                        className={cn('w-full justify-start', {
+                                            'bg-white text-primary shadow-sm font-bold': activeSection === item.key,
+                                            'bg-transparent text-black': activeSection !== item.key,
+                                        })}
+                                    >
+                                        {item.title}
+                                    </Button>
+                                ))}
+                            </nav>
+                        </div>
+                    </aside>
+
+                    <Separator className="my-6 md:hidden" />
+
+                    <div className="flex-1">
+                        <section className="space-y-12">{renderContent()}</section>
+                    </div>
+                </div>
+            </div>
+
+            {/* Settings Walkthrough */}
+            <SettingsWalkthrough 
+                open={showWalkthrough} 
+                onOpenChange={setShowWalkthrough}
+                onNavigateToSection={handleWalkthroughNavigation}
+            />
+        </AppLayout>
+    );
+}

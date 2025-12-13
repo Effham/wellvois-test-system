@@ -1,0 +1,475 @@
+tenant_id: [EMR_SAAS_TENANT]
+base_url: "https://[clinic-subdomain].emr-saas.com"
+knowledge:
+  version: "1.3"
+  updated_at: "2025-10-09"
+  context: "EMR SaaS — Settings. Purpose: let the LLM guide users on WHERE to perform actions, WHY something does/doesn't appear, and WHAT fields exist."
+  navigation:
+    organization:
+      label: Organization
+      url: /settings/organization
+    locations:
+      label: Locations
+      url: /settings/locations
+    practitioners_tabs:
+      list:
+        label: Practitioners
+        url: /settings/practitioners/list
+      invitations:
+        label: Invitations
+        url: /settings/practitioners/invitations
+    services:
+      label: Services
+      url: /settings/services
+    integrations:
+      label: Integrations
+      url: /settings/integrations
+  high_level_rules[6]:
+    "Settings uses different URLs per submenu but stays in the same page shell."
+    "Clinic can add a practitioner once; after creation, the clinic cannot edit Basic Info or Professional Details for that practitioner."
+    "Clinic admins CAN edit: (a) practitioner-to-location assignment (and practitioner hours within those locations) and (b) practitioner pricing per service (offer toggle + fee)."
+    "Services are managed at Settings → Services; practitioner-specific pricing overrides the service default price for that clinic."
+    "Locations are managed at Settings → Locations."
+    "Organization-level branding, time/locale, compliance, and appointment defaults are under Settings → Organization."
+  where_to_do_what[12]{action,where,url,notes}:
+    "Add a new location",Settings → Locations,/settings/locations,"Use 'Add New Location'; then attach practitioners."
+    "Edit a location (hours, contact, address)",Settings → Locations → open a location,/settings/locations,null
+    "Attach/remove practitioner from a location",Settings → Locations → open a location → Attach Practitioners,/settings/locations,"You can also set practitioner hours per location."
+    "Add a practitioner (one-time per practitioner)",Settings → Practitioners → Practitioners tab → Add Practitioner,/settings/practitioners/list,"Lookup supports first_name, last_name, optional license_number; if not found, fill Basic Info & Professional Details."
+    "Set practitioner hours per location",Settings → Locations → open a location (or from practitioner → Locations tab),/settings/locations,"Hours must fit inside the location's operating hours."
+    "Set practitioner pricing per service",Settings → Practitioners → open practitioner → Pricing,/settings/practitioners/list,"Toggle offer_service and set fee. Fee overrides service default price for this clinic."
+    "Invite / resend invite to practitioner",Settings → Practitioners → Invitations,/settings/practitioners/invitations,null
+    "Manage services (add/edit/archive)",Settings → Services,/settings/services,null
+    "Branding (logo/theme/colors/font)",Settings → Organization → Appearance,/settings/organization,null
+    "Time zone / locale / formats",Settings → Organization → Time & Locale,/settings/organization,null
+    "Compliance & business identifiers",Settings → Organization → Business & Compliance,/settings/organization,null
+    "Appointment defaults",Settings → Organization → Appointment Settings,/settings/organization,null
+  dependencies[3]:
+    goal: Attach a practitioner to a location
+    requires[2]: Practitioner exists, Location exists
+    how_to_create_missing[2]:
+      if_missing: Practitioner
+      do: "Add at /settings/practitioners/list (lookup by first_name, last_name, optional license_number; then invite/activate if applicable)"
+      if_missing: Location
+      do: "Create at /settings/locations"
+    ---
+    goal: Set practitioner-specific pricing
+    requires[2]: Practitioner exists, Service exists
+    how_to_create_missing[2]:
+      if_missing: Service
+      do: "Create at /settings/services"
+      then: "Open practitioner → Pricing at /settings/practitioners/list to set offer toggles and fees"
+    ---
+    goal: Set practitioner hours at a location
+    requires[2]: Location operating hours defined, Practitioner assigned to that location
+    how_to_create_missing[2]:
+      if_missing: Location hours
+      do: "Define in the location's detail at /settings/locations"
+      if_missing: Assignment
+      do: "Attach practitioner to the location first at /settings/locations"
+  permissions_and_editability[3]:
+    entity: Practitioner
+    create: "Clinic can add practitioner once via Settings → Practitioners."
+    edit:
+      clinic: "After creation, clinic cannot edit Basic Info or Professional Details. Clinic CAN edit (a) locations assignment and practitioner hours per assigned location, (b) pricing per service (offer toggle + fee)."
+      system_admin: "May edit identity/licensure per global policy (implementation-specific)."
+    ---
+    entity: Location
+    create_edit: "Clinic can create/edit location data and operating hours; can attach/detach practitioners and set practitioner hours for that location."
+    ---
+    entity: Service
+    create_edit: "Managed in Settings → Services (name/category/description/delivery mode/default price/status). Clinic sets practitioner-specific overrides via practitioner → Pricing."
+  troubleshooting[5]{symptom,explanations,fix,where_to_fix}:
+    "Practitioners not showing in Locations when attaching.",["No practitioners exist yet for this clinic.","Invitation pending / practitioner not active (if workflow requires activation).","Search/filter mismatch or wrong clinic context."],["Add practitioners at /settings/practitioners/list (use lookup: first_name, last_name, optional license_number).","Activate/accept invitations at /settings/practitioners/invitations.","Clear filters and ensure correct clinic context."],["/settings/practitioners/list","/settings/practitioners/invitations","/settings/locations"]
+    "Cannot edit practitioner name, email, license, or professional profile.",["By design, clinic cannot edit Basic Info or Professional Details after creation."],["Edit only locations assignment, practitioner hours, and pricing per service.","Escalate to system admin for identity/licensure updates if policy allows."],["/settings/practitioners/list","/settings/locations"]
+    "Practitioner pricing screen shows no services.",["No services exist yet.","Service is inactive/archived.","Practitioner not assigned to any location (some UIs hide pricing if unassigned)."],["Create/activate services at /settings/services.","Assign practitioner to at least one location at /settings/locations.","Then set offer toggles and fees under practitioner → Pricing."],["/settings/services","/settings/locations","/settings/practitioners/list"]
+    "Cannot set practitioner hours for a location.",["Location operating hours not defined.","Practitioner not yet attached to that location."],["Define location operating hours in /settings/locations.","Attach the practitioner to the location, then set practitioner-specific hours."],["/settings/locations"]
+    "Service visible but not selectable for booking with this practitioner.",["Offer toggle is OFF for that practitioner.","Service inactive/archived.","Delivery mode conflicts with clinic/practitioner availability rules."],["Turn ON 'offer service' in practitioner → Pricing.","Activate/edit the service at /settings/services.","Align delivery mode and availability settings."],["/settings/practitioners/list","/settings/services"]
+  faq_examples[10]{q,a}:
+    "Where can I add a new location?","Settings → Locations (/settings/locations) → 'Add New Location'."
+    "How do I attach a practitioner to a location?","Open the location at /settings/locations → 'Attach Practitioners' → Save. Set practitioner hours if needed."
+    "Why aren't practitioners appearing when I try to attach them to a location?","Add/activate practitioners first in Settings → Practitioners, or clear filters. Then attach from Locations."
+    "How do I set which services a practitioner offers and their fees?","Settings → Practitioners (/settings/practitioners/list) → open the practitioner → Pricing tab. Toggle 'offer service' and set fee."
+    "Why can't I edit a practitioner's basic or professional details?","Clinics can only edit locations assignment, practitioner hours, and pricing after creation. Basic/Professional details are locked by design."
+    "Where do I add or edit services?","Settings → Services (/settings/services). Practitioner-level overrides live under practitioner → Pricing."
+    "How do I change logo or theme?","Settings → Organization (/settings/organization) → Appearance tab."
+    "How do I set time zone or date/time format?","Settings → Organization → Time & Locale tab."
+    "Where do I enter tax/registration/license info for the clinic?","Settings → Organization → Business & Compliance tab."
+    "How do I change default session duration or booking windows?","Settings → Organization → Appointment Settings tab."
+  routing_aliases[6]{alias,maps_to}:
+    "public portal","/settings/locations|/settings/services|/settings/practitioners/list (depends on task)"
+    "public website","/settings/locations|/settings/services|/settings/practitioners/list"
+    "add doctor","/settings/practitioners/list"
+    "invite practitioner","/settings/practitioners/invitations"
+    "manage services","/settings/services"
+    "manage locations","/settings/locations"
+  knowledge:
+    /:
+      page_title: "Tenant Home Redirect"
+      module: Core
+      description: "Redirects to tenant login or appropriate landing based on auth. Access: Public; authenticated users are redirected by role to dashboards. Workflow: detect session → resolve role → route to practitioner or patient dashboard. Source: routes/tenant.php (home)."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        redirect_target,"Computed destination path based on role","System computed; read-only."
+      user_actions[1]: "Navigate to Login"
+    /login:
+      page_title: "Tenant Login Redirect"
+      module: Authentication
+      description: "Redirects users to central login to begin secure SSO. Access: Public. Workflow: tenant → central SSO → back to tenant /sso/start. Source: routes/tenant.php (/login)."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        central_login_url,"Computed central login URL with return path","System generated; read-only."
+      user_actions[1]: "Proceed to Central Login"
+    /sso/start:
+      page_title: "SSO Start (Tenant)"
+      module: Authentication
+      description: "Receives one-time SSO code and establishes tenant session after secure server-to-server exchange. Access: Public (code-bound). Workflow: validate code → exchange in central → create/update tenant user → assign role (Patient if linked) → login → redirect. Source: routes/tenant.php (/sso/start)."
+      key_data_fields[2]{field_name,purpose,edit_constraints}:
+        code,"Opaque one-time code for SSO exchange","Single-use; expires; read-only from URL"
+        redirect_internal,"Post-auth tenant path","Computed at central; read-only."
+      user_actions[2]: "Establish Session", "Redirect to Dashboard"
+    /logout:
+      page_title: "Global Logout"
+      module: Authentication
+      description: "Terminates tenant session (and optionally public portal), then redirects to central login. Access: Authenticated. Workflow: perform global logout service → invalidate session → compute redirect (central or public portal). Source: routes/tenant.php (logout)."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        from_public_portal,"Signals public portal flow","Query param; read-only at runtime."
+      user_actions[1]: Logout
+    /dashboard:
+      page_title: "Tenant Dashboard"
+      module: Core
+      description: "Role-aware landing. Access: Authenticated. Workflow: if Patient → patient dashboard; if Practitioner → practitioner dashboard; else render tenant dashboard. Source: routes/tenant.php (dashboard)."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        auth.user.roles,"Determines landing destination and visible widgets","Managed by RBAC; read-only to UI."
+      user_actions[1]: "Navigate to Role Dashboard"
+    /patient-dashboard:
+      page_title: "Patient Dashboard"
+      module: "Patient Portal"
+      description: "Shows patient-specific tiles and summaries. Access: Authenticated Patient. Workflow: resolve patient in central by email → load tenant appointments and tiles. Source: routes/tenant.php (patient-dashboard), Tenant\\PatientDashboardController@index."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        appointments_summary,"Upcoming/Recent appointments","Read-only aggregation."
+      user_actions[2]: "View Appointments", "Manage Health History"
+    /practitioner-dashboard:
+      page_title: "Practitioner Dashboard"
+      module: Clinical
+      description: "Practitioner landing with schedule and tasks. Access: Role 'Practitioner'. Workflow: load practitioner context from central → render schedules, tasks. Source: routes/tenant.php (practitioner-dashboard), Tenant\\PractitionerDashboardController@index."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        today_schedule,"List of today's sessions","Read-only aggregation."
+      user_actions[2]: "Open Session", "Review Tasks"
+    /attendance/status:
+      page_title: "Attendance Status"
+      module: Workforce
+      description: "Returns current user's clock state and last events. Access: Authenticated. Workflow: query attendance state. Source: routes/tenant.php (attendance group), Tenant\\AttendanceController@getStatus."
+      key_data_fields[3]{field_name,purpose,edit_constraints}:
+        status,IN/OUT state,"Computed; read-only."
+        last_clock_in,"Timestamp of last IN","System-managed; read-only."
+        last_clock_out,"Timestamp of last OUT","System-managed; read-only."
+      user_actions[1]: "View Status"
+    /attendance/clock-in:
+      page_title: "Clock In"
+      module: Workforce
+      description: "Creates a clock-in entry. Access: Authenticated staff. Workflow: validate state → insert attendance record. Source: Tenant\\AttendanceController@clockIn."
+      key_data_fields[2]{field_name,purpose,edit_constraints}:
+        timestamp,Clock-in time,"Server time; read-only to end-user."
+        location,"Optional point of service","Editable by user; validated by controller if present."
+      user_actions[1]: "Clock In"
+    /attendance/clock-out:
+      page_title: "Clock Out"
+      module: Workforce
+      description: "Creates a clock-out entry. Access: Authenticated staff. Workflow: validate matching IN → write OUT. Source: Tenant\\AttendanceController@clockOut."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        timestamp,Clock-out time,"Server time; read-only to end-user."
+      user_actions[1]: "Clock Out"
+    /activity-logs:
+      page_title: "Activity Logs"
+      module: Audit
+      description: "Lists tenant activity logs. Access: Authenticated (often Admin). Workflow: paginate activitylog entries. Source: ActivityLogController@index."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        filters,"Filter by actor/date/module","Editable by Admin; filters only."
+      user_actions[1]: "Review Logs"
+    /calendar:
+      page_title: Calendar
+      module: Scheduling
+      description: "Role-aware calendar. Access: Authenticated. Workflow: If Patient, load their appointments; else route to CalendarController@index. Source: routes/tenant.php (/calendar)."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        appointments[],"Events for the view","Read-only aggregation."
+      user_actions[1]: "Browse Calendar"
+    /appointments:
+      page_title: "Appointments Index"
+      module: Scheduling
+      description: "Shows appointment list/grid with filters. Access: Authenticated; typically Scheduler/Admin. Workflow: load filters → fetch data via Tenant\\AppointmentController@index. Source: routes/tenant.php (appointments group)."
+      key_data_fields[4]{field_name,purpose,edit_constraints}:
+        practitioner,Filter by provider,"Editable by Scheduler/Admin."
+        location,Filter by clinic site,"Editable by Scheduler/Admin."
+        service,Filter by service type,"Editable by Scheduler/Admin."
+        date_range,Filter by window,"Editable by Scheduler/Admin."
+      user_actions[2]: "Browse Appointments", "Open Create"
+    /appointments/create:
+      page_title: "Create Appointment"
+      module: Scheduling
+      description: "Create an appointment. Access: Scheduler, Admin. Workflow: search/link patient → select service/location → calculate availability → store appointment (Tenant\\AppointmentController@store)."
+      key_data_fields[5]:
+        patient:
+          purpose: "Patient to link"
+          edit_constraints: "Editable by 'Scheduler' and 'Admin' until appointment completed."
+        service:
+          purpose: "Determines default duration and type"
+          edit_constraints:
+            roles[2]: Scheduler, Admin
+            when: "Editable until status is 'completed'"
+        location:
+          purpose: "Clinic site"
+          edit_constraints: "Editable by 'Scheduler' if provider supports location."
+        datetime:
+          purpose: "Scheduled start"
+          edit_constraints: "Editable by 'Scheduler'/'Admin' if status in ['pending','confirmed']."
+        mode:
+          purpose: "In-person or virtual"
+          edit_constraints: "Editable before session start; read-only after."
+      user_actions[4]: "Search Patients", "Link Patient", "Check Availability", "Save Appointment"
+    /appointments/[appointment_id]/manage-appointment:
+      page_title: "Manage Appointment"
+      module: Scheduling
+      description: "Modify appointment details with audit. Access: Scheduler, Admin; Practitioners may edit notes only. Workflow: validate status rules → apply changes → log activity. Source: Tenant\\AppointmentController@updateManageAppointment."
+      key_data_fields[4]{field_name,purpose,edit_constraints}:
+        service,"Change visit type","Editable by 'Scheduler'/'Admin' if status != 'completed'."
+        location,"Update clinic site","Editable by 'Scheduler'/'Admin' if provider supports location."
+        datetime,"Reschedule time","Editable by 'Scheduler' if > 1 hour before start; 'Admin' anytime."
+        notes,"Operational notes","Editable by 'Scheduler','Admin', and assigned 'Practitioner' until completed."
+      user_actions[2]: "Edit Appointment", "Save Changes"
+    /appointments/[appointment_id]/status:
+      page_title: "Update Appointment Status"
+      module: Scheduling
+      description: "Transition appointment status. Access: Scheduler, Admin. Workflow: validate allowed transitions (e.g., pending ⇄ confirmed; cannot modify after completed) → persist. Source: Tenant\\AppointmentController@updateStatus."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        status,Lifecycle state,"Editable by Scheduler/Admin only while not 'completed'."
+      user_actions[1]: "Update Status"
+    /appointments/[appointment_id]/session:
+      page_title: "Session Details"
+      module: Clinical
+      description: "Encounter context for an appointment. Access: Assigned Practitioner; enforced by pivot check. Workflow: verify practitioner assignment → load patient (central) and encounter → render session. Source: routes/tenant.php (current-session)."
+      key_data_fields[2]{field_name,purpose,edit_constraints}:
+        appointment,"Encounter anchor","Read-only context."
+        encounter,"Clinical notes and vitals","Editable by assigned Practitioner while session active."
+      user_actions[2]: "Start Session", "Capture Notes"
+    /appointments/[appointment_id]/ai-summary:
+      page_title: "AI Summary"
+      module: "Clinical AI"
+      description: "Displays AI-generated summary for the appointment context. Access: Practitioner/Admin. Workflow: assemble patient context → call BedrockAIService → render. Source: Tenant\\AppointmentController@showAISummary, Tenant\\AISummaryController."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        patient_context,"Aggregated medical history for LLM","System generated; read-only."
+      user_actions[2]: "View Summary", "Send to Patient"
+    /ai-summary/generate:
+      page_title: "Generate AI Summary"
+      module: "Clinical AI"
+      description: "Generates AI summary with robust fallbacks. Access: Practitioner/Admin. Workflow: load appointment + patient + diseases (Tenant\\PatientMedicalHistory), family history, allergens (Tenant\\KnownAllergy), prior encounters → BedrockAIService.generateSummary → return bullets or fallback static summary. Source: Tenant\\AISummaryController@generateSummary."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        appointment_id,"Target appointment","Required integer; validated server-side."
+      user_actions[1]: "Generate Summary"
+    /notes:
+      page_title: "Notes Index"
+      module: "Clinical Documentation"
+      description: "List/create clinical notes. Access: Authenticated; typically Practitioner/Admin. Workflow: render list; create via Tenant\\NoteController."
+      key_data_fields[2]{field_name,purpose,edit_constraints}:
+        title,"Note heading","Required on create; editable by author/admin."
+        content,"Note body","Editable by author/admin until signed where applicable."
+      user_actions[2]: "Create Note", Reorder
+    /encounters/[encounter_id]/documents:
+      page_title: "Encounter Documents"
+      module: "Clinical Documentation"
+      description: "Upload/list/manage documents for an encounter. Access: Practitioner/Admin. Workflow: upload to S3 via signed URL → store metadata → versioned updates. Source: Tenant\\EncounterDocumentController."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        documents[],"Files linked to encounter","Upload permitted to authorized roles; downloads open to same."
+      user_actions[2]: "Upload Document", "View Document"
+    /wallet:
+      page_title: "Wallet Overview"
+      module: Financials
+      description: "Tenant wallet dashboard. Access: Admin/Finance roles. Workflow: aggregate balances; allow recalculation endpoint. Source: WalletController@index + Tenant Wallet API routes."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        balances,"Computed financial summary","System computed; read-only."
+      user_actions[1]: "View Wallet"
+    /wallet/[wallet_id]/recalculate:
+      page_title: "Recalculate Wallet"
+      module: Financials
+      description: "Recomputes wallet balance. Access: Admin/Finance. Workflow: backend recomputation from transactions; audited. Source: Tenant Wallet API controller."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        wallet_id,"Target wallet","Required; Admin/Finance only."
+      user_actions[1]: "Recalculate Balance"
+    /my-details:
+      page_title: "My Details"
+      module: Profile
+      description: "Role-aware profile editor. Access: Logged-in user (Patient/Practitioner). Workflow: GET shows profile; PUT updates allowed sections. Source: Tenant\\PatientDashboardController@myDetails/@updateMyDetails."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        contact_info,"User contact details","Editable only by logged-in user (self-service)."
+      user_actions[1]: "Update Details"
+    /settings/organization:
+      page_title: "Organization Settings"
+      module: Settings
+      description: "Initial setup and ongoing practice configuration. Access: Admin. Workflow: update practice profile → branding → time/locale → appointment rules; save may trigger cache refresh. Composed of Practice Details, Appearance, Time & Locale, Business & Compliance, and Appointment Settings tabs."
+      key_data_fields[5]:
+        "Practice Details":
+          purpose: "Legal/operational practice data (e.g., Practice Name, Contact Email)"
+          edit_constraints: "Admin-only; Practice Name is required."
+        Appearance:
+          purpose: "Branding elements (Logo, Theme, Custom Color, Font)"
+          edit_constraints: "Admin-only; manages visual identity."
+        "Time & Locale":
+          purpose: "Time Zone, Locale, Date/Time Formats"
+          edit_constraints: "Admin-only; Time Zone is required and affects scheduling."
+        "Business & Compliance":
+          purpose: "Official identifiers (Tax ID, License Expiry, Address)"
+          edit_constraints: "Admin-only."
+        "Appointment Settings":
+          purpose: "Global defaults (Default Session Duration, Min/Max Advance Booking)"
+          edit_constraints: "Admin-only; Default Session Duration is required."
+      user_actions[3]: "Edit Organization Settings", "Upload Logo", Save
+    /organization/practice-details:
+      page_title: "Update Practice Details (API)"
+      module: "Settings API"
+      description: "Updates OrganizationSetting values prefixed with practice_details_. Access: Admin with permission:view-settings. Workflow: POST validate → save settings. Source: routes/settings.php (organization.*)."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        practice_details_*,"Atomic fields (name, contact, address)","Admin-only; validated per field type."
+      user_actions[1]: Save
+    /organization/appearance:
+      page_title: "Update Appearance (API)"
+      module: "Settings API"
+      description: "Updates appearance_* settings and logo S3 key. Access: Admin with permission:view-settings. Workflow: accept S3 key → compute proxy URL → persist. Source: SettingsController@updateAppearance."
+      key_data_fields[3]{field_name,purpose,edit_constraints}:
+        appearance_theme_color,Theme color,Admin-only
+        appearance_font_family,Brand font,Admin-only
+        appearance_logo_s3_key,"S3 key for logo","Admin-only; must be valid key; MIME validated downstream."
+      user_actions[1]: Save
+    /settings/locations:
+      page_title: Locations
+      module: Administration
+      description: "Manage clinic locations, including adding new sites, editing details, setting operating hours, and attaching practitioners. Access: Admin. Workflow: CRUD locations; configure operating hours; assign practitioners."
+      key_data_fields[5]{field_name,purpose,edit_constraints}:
+        location_name,"Name of the clinic site","Admin-only; Required on creation."
+        location_timezone,"Time zone for this location","Admin-only; Required; impacts scheduling and displays."
+        operating_hours,"Weekly hours the location is open","Admin-only; must be defined before practitioner hours can be set."
+        attach_practitioners,"List of practitioners assigned to this location","Admin-only; a practitioner must exist before they can be attached."
+        practitioner_hours,"Specific working hours for each assigned practitioner within location hours","Admin-only; hours must be a subset of the location's operating hours."
+      user_actions[4]: "Add New Location", "Edit Location Details", "Set Location Hours", "Attach Practitioners"
+    /locations/[location_id]/operating-hours:
+      page_title: "Operating Hours"
+      module: Administration
+      description: "Gets or updates operating hours for a location and coordinates with practitioner hours. Access: Admin (via settings pages) and location managers. Workflow: enable days → define time slots; disabling a day may prompt to remove practitioners’ hours (see disable-day). Source: routes/tenant.php (locations.operating-hours.get/update), Settings UI resources/js/pages/settings/Location/OperatingHours.tsx, LocationController."
+      key_data_fields[2]{field_name,purpose,edit_constraints}:
+        day_of_week,"Which day the slot applies to","Admin/location-manager editable in UI."
+        time_slots[],"Start/End ranges for the day","Must not overlap; within reasonable business hours (enforced by UI/ops)."
+      user_actions[3]: "Enable Day", "Add Time Slot", Save
+    /locations/[location_id]/disable-day:
+      page_title: "Disable Day (Cascade)"
+      module: Administration
+      description: "Disables a day for operating hours and removes matching practitioner availability for provided practitioners. Access: Admin/location-manager. Workflow: validate day enum → update OperatingHours (set is_enabled=false, 00:00–00:00) → delete rows in practitioner_availability for given practitioner_ids/day → commit. Source: LocationController@disableDay."
+      key_data_fields[2]{field_name,purpose,edit_constraints}:
+        day,"Target day of week","Required; one of sunday..saturday."
+        practitioner_ids[],"Practitioners affected","Optional array of integers; Admin/location-manager only."
+      user_actions[1]: "Confirm Disable Day"
+    /practitioners:
+      page_title: Practitioners
+      module: "Provider Management"
+      description: "List and manage practitioners linked to tenant. Access: Users with permission:view-practitioner. Workflow: search/paginate; invitation status via tenant pivot; profile picture proxied from S3. Source: Tenant\\PractitionerController@index."
+      key_data_fields[2]{field_name,purpose,edit_constraints}:
+        search,"Filter by name/email/title","Editable by viewers; server sanitizes length and pattern."
+        invitation_status,"Link state to tenant","System-derived; read-only."
+      user_actions[5]: Invite, Link, Edit, "Manage Availability", "Assign Services"
+    /settings/practitioners/list:
+      page_title: "Practitioner List and Management"
+      module: "Provider Management"
+      description: "Index view for practitioners. Allows adding a new practitioner (one-time Basic/Professional details entry) and editing ongoing assignments (Locations, Hours, Pricing). Access: Admin. Clinic cannot edit Basic Info or Professional Details after initial creation."
+      key_data_fields[4]:
+        "Add Practitioner":
+          purpose: "Initiates the one-time creation flow."
+          edit_constraints: "Admin-only. Basic Info fields (first_name, last_name, email) and Professional Details are **locked** after initial save."
+        "Edit Practitioner":
+          purpose: "Opens the edit flow for ongoing management."
+          edit_constraints: "Admin-only. Only the Locations Assignment and Pricing sections are editable."
+        locations_assignment:
+          purpose: "Practitioner-to-location links and working hours."
+          edit_constraints: "Admin-only; **Editable after creation**."
+        "pricing (service_offerings)":
+          purpose: "Toggle which services a practitioner offers and their custom fee."
+          edit_constraints: "Admin-only; **Editable after creation**; custom fee overrides default service price."
+      user_actions[2]: "Add Practitioner", "Edit Locations/Hours/Pricing"
+    /settings/practitioners/invitations:
+      page_title: "Practitioner Invitations"
+      module: "Provider Management"
+      description: "List of pending or failed practitioner invitations, allowing for resend or revocation. Access: Admin."
+      key_data_fields[3]{field_name,purpose,edit_constraints}:
+        email,"Invited email address","Read-only."
+        status,"Invitation state (e.g., pending, accepted, failed)","System-derived; read-only."
+        "Resend Invitation","Sends a new invitation link.","Admin-only action."
+      user_actions[2]: "Resend Invitation", "Revoke Invitation"
+    /practitioners/basic-info:
+      page_title: "Save Practitioner Basic Info"
+      module: "Provider Management"
+      description: "Creates or updates basic info. Access: permission:add-practitioner (create) and permission:update-practitioner (update). Workflow: validate fields → for existing, if completed basic info then only the practitioner themselves (user_id match) can edit; supports S3 file keys for profile and documents; links practitioner to tenant upon creation. Source: Tenant\\PractitionerController@storeBasicInfo."
+      key_data_fields[4]{field_name,purpose,edit_constraints}:
+        first_name,Given name,"required|string|max:255; Admin/Scheduler until completed; then practitioner self-service only. **LOCKED by clinic post-creation**."
+        last_name,Family name,"required|string|max:255; same as above. **LOCKED by clinic post-creation**."
+        email,"Contact and login mapping","required|email|max:255; immutable post-create except by practitioner self or admin process. **LOCKED by clinic post-creation**."
+        profile_picture_s3_key,"S3 image key","optional|string; Admin/Scheduler or practitioner; proxied via /profile-picture-proxy."
+      user_actions[1]: "Save Basic Info"
+    /practitioners/combined-details:
+      page_title: "Save Combined Practitioner Details"
+      module: "Provider Management"
+      description: "Create/update both basic and professional details in one step. Access: permission:add-practitioner or permission:update-practitioner. If both basic info and professional details already saved, form becomes read-only and redirects to locations tab. Source: Tenant\\PractitionerController@storeCombinedDetails."
+      key_data_fields[4]{field_name,purpose,edit_constraints}:
+        credentials[],Degrees/certifications,"required|array|min:1; Admin/Scheduler until first save; afterwards **LOCKED by clinic** via this form."
+        license_number,"Professional license","required|string|max:100; masked in certain flows; same **LOCKED** rule."
+        primary_specialties[],"Primary specialties","required|array|min:1; same **LOCKED** rule."
+        resume_files_s3_keys[],"CV uploads (S3)","optional|array of strings; merged with existing."
+      user_actions[1]: "Save Combined Details"
+    /practitioners/[practitioner_id]/locations/[location_id]/availability:
+      page_title: "Practitioner Location Availability"
+      module: "Provider Management"
+      description: "Get/Set clinic hours for a practitioner at a location. Access: permission:update-practitioner (POST); view requires link to tenant. Hours must be within the location's operating hours. Source: Tenant\\PractitionerController@getLocationAvailability/storeLocationAvailability."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        availability_schedule,"Map day→array of time slots {start,end}","required|array (POST); replaces existing; Admin/Scheduler with update-practitioner permission. Must respect Location Operating Hours."
+      user_actions[2]: "View Availability", "Update Availability"
+    /practitioners/[practitioner_id]/services:
+      page_title: "Practitioner Services"
+      module: "Provider Management"
+      description: "Get/Set services offered by practitioner with custom price/duration. Access: permission:update-practitioner for POST. Custom price/duration overrides the service default. Source: Tenant\\PractitionerController@getPractitionerServices/storePractitionerServices."
+      key_data_fields[3]{field_name,purpose,edit_constraints}:
+        services[].pivot.is_offered,Offer toggle,"boolean; false removes pivot row."
+        services[].pivot.custom_price,"Price override (fee)","nullable|numeric|min:0; Admin/Scheduler with update-practitioner. Overrides default service price."
+        services[].pivot.custom_duration_minutes,"Duration override (minutes)","nullable|integer|min:15|max:480."
+      user_actions[2]: "Assign Services", "Set Pricing"
+    /practitioners/pricing:
+      page_title: "Practitioner Pricing"
+      module: "Provider Management"
+      description: "Store pricing payload on practitioner. Access: permission:update-practitioner. Workflow: validates practitioner_id and payload; updates model. Source: Tenant\\PractitionerController@storePricing."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        service_pricing,"Pricing map for services","optional|array; Admin/Scheduler with update-practitioner."
+      user_actions[1]: "Save Pricing"
+    /settings/services:
+      page_title: "Service Management"
+      module: Settings
+      description: "Manage the clinic's catalog of services (treatments, sessions, etc.). Defines default price and status. Access: Admin. Practitioner-specific pricing is managed elsewhere."
+      key_data_fields[4]{field_name,purpose,edit_constraints}:
+        service_name,"Human-readable name of the service","Admin-only; Required."
+        delivery_mode,"How the service is provided (in_person, virtual)","Admin-only; Enum value required."
+        default_price,"The standard price for this service","Admin-only; overridden by practitioner-specific pricing."
+        status,"Service availability (active, inactive, archived)","Admin-only; affects booking availability."
+      user_actions[3]: "Add Service", "Edit Service", "Archive Service"
+    /users:
+      page_title: Users
+      module: Administration
+      description: "Manage tenant users (RBAC). Access: Admin. Workflow: index/create/edit with role assignment endpoint. Source: routes/tenant.php (users resource)."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        roles[],"Role assignments","Admin-only; via PATCH users/{user}/role."
+      user_actions[3]: "Invite User", "Assign Roles", "Archive/Restore"
+    /roles:
+      page_title: Roles
+      module: Administration
+      description: "RBAC role management. Access: Admin. Workflow: create/edit/delete roles; attach permissions used by controllers (e.g., view-practitioner, add-practitioner, update-practitioner). Source: RoleController."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        permissions[],"Grants capabilities to role","Admin-only."
+      user_actions[2]: "Create Role", "Assign Permissions"
+    /public-portal:
+      page_title: "Public Portal Home"
+      module: "Public Portal"
+      description: "Tenant-branded public site. Access: Public. Workflow: services/locations/staff/booking flows. Source: PublicPortalController."
+      key_data_fields[1]{field_name,purpose,edit_constraints}:
+        services,Catalog for booking,"Read-only to public; Admin edits via settings/services."
+      user_actions[2]: "Browse Services", "Book Appointment"

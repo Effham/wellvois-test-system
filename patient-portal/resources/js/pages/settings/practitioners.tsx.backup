@@ -1,0 +1,157 @@
+import { useState, useEffect } from 'react';
+import { usePage } from '@inertiajs/react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Users, Send } from 'lucide-react';
+import SettingsLayout from '@/layouts/settings-layout';
+import PractitionerIndex from '../Practitioner/Index';
+import InvitationsTable from '../Practitioner/InvitationsTable';
+import PractitionerCreate from '../Practitioner/Create';
+
+type Practitioner = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    title?: string;
+    phone_number?: string;
+    gender?: string;
+    pronoun?: string;
+    email: string;
+    short_bio?: string;
+    full_bio?: string;
+    invitation_status?: string;
+};
+
+interface Props {
+    practitioners?: any;
+    invitations?: any;
+    filters?: any;
+    locations?: any;
+    services?: any;
+    editPractitioner?: any;
+}
+
+export default function PractitionersSettings({ 
+    practitioners, 
+    invitations, 
+    filters, 
+    locations, 
+    services, 
+    editPractitioner 
+}: Props) {
+    const { flash }: any = usePage()?.props || {};
+    const [showCreateForm, setShowCreateForm] = useState(false);
+    const [editingPractitioner, setEditingPractitioner] = useState<Practitioner | null>(null);
+
+    // Handle URL parameters for practitioner editing
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const practitionerId = urlParams.get('practitioner_id');
+        
+        if (practitionerId && editPractitioner) {
+            setEditingPractitioner(editPractitioner);
+            setShowCreateForm(true);
+        }
+    }, [editPractitioner]);
+
+    const handleCreatePractitioner = () => {
+        setEditingPractitioner(null);
+        setShowCreateForm(true);
+    };
+
+    const handleEditPractitioner = (practitioner: Practitioner) => {
+        setEditingPractitioner(practitioner);
+        setShowCreateForm(true);
+    };
+
+    const handleCancelPractitionerForm = () => {
+        setShowCreateForm(false);
+        setEditingPractitioner(null);
+        
+        // Clean up URL parameters when canceling edit
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            if (url.searchParams.has('practitioner_id')) {
+                url.searchParams.delete('practitioner_id');
+                window.history.replaceState({}, '', url.pathname + url.search);
+            }
+        }
+    };
+
+    const renderContent = () => {
+        try {
+            if (showCreateForm) {
+                return (
+                    <div className="space-y-6">
+                        <PractitionerCreate
+                            practitioner={editingPractitioner}
+                            locations={locations}
+                            services={services}
+                            onCancel={handleCancelPractitionerForm}
+                            canEditBasicInfo={(editingPractitioner as any)?.canEditBasicInfo ?? true}
+                            canEditProfessionalDetails={(editingPractitioner as any)?.canEditProfessionalDetails ?? true}
+                        />
+                    </div>
+                );
+            }
+
+            return (
+                <Card className="border-none shadow-none">
+                    <CardContent>
+                        <Tabs defaultValue="practitioners" className="w-full">
+                            <div className="pb-4">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="practitioners" className="flex items-center space-x-2">
+                                        <Users className="h-4 w-4" />
+                                        <span>Practitioners</span>
+                                    </TabsTrigger>
+                                    <TabsTrigger value="invitations" className="flex items-center space-x-2">
+                                        <Send className="h-4 w-4" />
+                                        <span>Invitations</span>
+                                    </TabsTrigger>
+                                </TabsList>
+                            </div>
+
+                            <TabsContent value="practitioners" className="mt-0">
+                                <PractitionerIndex
+                                    standalone={false}
+                                    practitioners={practitioners || {}}
+                                    filters={filters || {}}
+                                    onCreateClick={handleCreatePractitioner}
+                                    onEditClick={handleEditPractitioner}
+                                />
+                            </TabsContent>
+
+                            <TabsContent value="invitations" className="mt-0">
+                                <InvitationsTable 
+                                    standalone={false}
+                                    invitations={invitations || {}}
+                                    filters={filters || {}}
+                                />
+                            </TabsContent>
+                        </Tabs>
+                    </CardContent>
+                </Card>
+            );
+        } catch (error) {
+            console.error('Error rendering practitioners content:', error);
+            return (
+                <div className="p-6">
+                    <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                        <p className="text-red-800">
+                            An error occurred while loading the practitioners section. Please refresh the page and try again.
+                        </p>
+                    </div>
+                </div>
+            );
+        }
+    };
+
+    return (
+        <SettingsLayout activeSection="practitioners" title="Practitioners Settings">
+            {renderContent()}
+        </SettingsLayout>
+    );
+}

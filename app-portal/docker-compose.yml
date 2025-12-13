@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: laravel_app
+    ports:
+      - "8000:80"
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: host.docker.internal
+      DB_PORT: 3306
+      DB_DATABASE: multi_tenancy_master
+      DB_USERNAME: root
+      DB_PASSWORD: ""
+    volumes:
+      - .:/var/www/html  # Keep this for local development (only)
