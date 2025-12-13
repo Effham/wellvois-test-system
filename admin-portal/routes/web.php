@@ -653,7 +653,7 @@ foreach (config('tenancy.central_domains') as $domain) {
         Route::post('/patient/invitation/{token}', [\App\Http\Controllers\PatientInvitationController::class, 'accept'])
             ->name('patient.invitation.accept.submit');
 
-        // require __DIR__.'/settings.php';
+        require __DIR__.'/settings.php';
         require __DIR__.'/auth.php';
         require __DIR__.'/diagnostic-routes.php';
 

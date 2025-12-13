@@ -40,7 +40,7 @@ Route::middleware('auth')->group(function () {
 
         // If user has no settings permissions, redirect to dashboard with error
         return redirect()->route('dashboard')->with('error', 'You do not have permission to access settings.');
-    })->name('settings.index')->middleware('require-tenant');
+    })->name('settings.index');
 
     // Individual settings pages
     // Organization settings with deferred loading support

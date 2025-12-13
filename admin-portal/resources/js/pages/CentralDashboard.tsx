@@ -92,14 +92,18 @@ function CentralDashboard() {
                 const response = await fetch('/api/central/dashboard/data', {
                     method: 'GET',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
                     },
-                    credentials: 'same-origin',
+                    credentials: 'include', // Include cookies/session for authentication
                 });
 
                 if (!response.ok) {
+                    if (response.status === 401) {
+                        // If unauthorized, redirect to login
+                        window.location.href = '/admin/login';
+                        return;
+                    }
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
@@ -138,14 +142,6 @@ function CentralDashboard() {
         <>
             <Head title="Central Dashboard" />
             <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight">Central Admin Dashboard</h1>
-                        <p className="text-muted-foreground">Overview of all tenants and system statistics</p>
-                    </div>
-                </div>
-
                 {/* Dashboard Data Loading Error */}
                 {error && (
                     <Alert className="bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800">
@@ -168,98 +164,110 @@ function CentralDashboard() {
                     <>
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {/* Total Tenants */}
-                            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-100 dark:from-blue-950 dark:to-indigo-950 dark:border-blue-800">
+                            <Card className="border border-border bg-white hover:shadow-md transition-shadow">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                                    <CardTitle className="text-sm font-medium text-foreground">
                                         Total Tenants
                                     </CardTitle>
-                                    <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                    <div className="bg-primary/10 p-2 rounded-lg">
+                                        <Building2 className="h-4 w-4 text-primary" />
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">{stats.totalTenants}</div>
-                                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                                    <div className="text-2xl font-bold text-primary">{stats.totalTenants}</div>
+                                    <p className="text-xs text-muted-foreground">
                                         All registered organizations
                                     </p>
                                 </CardContent>
                             </Card>
 
                             {/* Active Tenants (Last 30 Days) */}
-                            <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-100 dark:from-green-950 dark:to-emerald-950 dark:border-green-800">
+                            <Card className="border border-border bg-white hover:shadow-md transition-shadow">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium text-green-800 dark:text-green-200">
+                                    <CardTitle className="text-sm font-medium text-foreground">
                                         New Tenants (30d)
                                     </CardTitle>
-                                    <UserPlus className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                    <div className="bg-primary/10 p-2 rounded-lg">
+                                        <UserPlus className="h-4 w-4 text-primary" />
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-2xl font-bold text-green-900 dark:text-green-100">{stats.activeTenants}</div>
-                                    <p className="text-xs text-green-600 dark:text-green-400">
+                                    <div className="text-2xl font-bold text-primary">{stats.activeTenants}</div>
+                                    <p className="text-xs text-muted-foreground">
                                         Recently joined
                                     </p>
                                 </CardContent>
                             </Card>
 
                             {/* Total Users */}
-                            <Card className="bg-gradient-to-br from-purple-50 to-violet-50 border-purple-100 dark:from-purple-950 dark:to-violet-950 dark:border-purple-800">
+                            <Card className="border border-border bg-white hover:shadow-md transition-shadow">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium text-purple-800 dark:text-purple-200">
+                                    <CardTitle className="text-sm font-medium text-foreground">
                                         Total Users
                                     </CardTitle>
-                                    <Users className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                    <div className="bg-primary/10 p-2 rounded-lg">
+                                        <Users className="h-4 w-4 text-primary" />
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">{stats.totalUsers}</div>
-                                    <p className="text-xs text-purple-600 dark:text-purple-400">
+                                    <div className="text-2xl font-bold text-primary">{stats.totalUsers}</div>
+                                    <p className="text-xs text-muted-foreground">
                                         Across all tenants
                                     </p>
                                 </CardContent>
                             </Card>
 
                             {/* Growth Rate */}
-                            <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-100 dark:from-amber-950 dark:to-orange-950 dark:border-amber-800">
+                            <Card className="border border-border bg-white hover:shadow-md transition-shadow">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                    <CardTitle className="text-sm font-medium text-foreground">
                                         Growth Rate
                                     </CardTitle>
-                                    <TrendingUp className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                    <div className="bg-primary/10 p-2 rounded-lg">
+                                        <TrendingUp className="h-4 w-4 text-primary" />
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-2xl font-bold text-amber-900 dark:text-amber-100">
+                                    <div className="text-2xl font-bold text-primary">
                                         {stats.growthRate > 0 ? '+' : ''}{stats.growthRate}%
                                     </div>
-                                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    <p className="text-xs text-muted-foreground">
                                         This month vs last month
                                     </p>
                                 </CardContent>
                             </Card>
 
                             {/* Total Patients */}
-                            <Card className="bg-gradient-to-br from-rose-50 to-pink-50 border-rose-100 dark:from-rose-950 dark:to-pink-950 dark:border-rose-800">
+                            <Card className="border border-border bg-white hover:shadow-md transition-shadow">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium text-rose-800 dark:text-rose-200">
+                                    <CardTitle className="text-sm font-medium text-foreground">
                                         Total Patients
                                     </CardTitle>
-                                    <Activity className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                                    <div className="bg-primary/10 p-2 rounded-lg">
+                                        <Activity className="h-4 w-4 text-primary" />
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-2xl font-bold text-rose-900 dark:text-rose-100">{stats.totalPatients}</div>
-                                    <p className="text-xs text-rose-600 dark:text-rose-400">
+                                    <div className="text-2xl font-bold text-primary">{stats.totalPatients}</div>
+                                    <p className="text-xs text-muted-foreground">
                                         Registered in system
                                     </p>
                                 </CardContent>
                             </Card>
 
                             {/* Total Practitioners */}
-                            <Card className="bg-gradient-to-br from-cyan-50 to-sky-50 border-cyan-100 dark:from-cyan-950 dark:to-sky-950 dark:border-cyan-800">
+                            <Card className="border border-border bg-white hover:shadow-md transition-shadow">
                                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                    <CardTitle className="text-sm font-medium text-cyan-800 dark:text-cyan-200">
+                                    <CardTitle className="text-sm font-medium text-foreground">
                                         Total Practitioners
                                     </CardTitle>
-                                    <Users className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+                                    <div className="bg-primary/10 p-2 rounded-lg">
+                                        <Users className="h-4 w-4 text-primary" />
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">{stats.totalPractitioners}</div>
-                                    <p className="text-xs text-cyan-600 dark:text-cyan-400">
+                                    <div className="text-2xl font-bold text-primary">{stats.totalPractitioners}</div>
+                                    <p className="text-xs text-muted-foreground">
                                         Active healthcare providers
                                     </p>
                                 </CardContent>

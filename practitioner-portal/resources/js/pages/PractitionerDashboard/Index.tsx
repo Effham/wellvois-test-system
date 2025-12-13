@@ -355,7 +355,7 @@ export default function PractitionerDashboard({
                                     </div>
                                     
                                     {/* Clinic Selector - Only show in central context */}
-                                    {isCentral && (
+                                    {isCentral && clinics && clinics.length > 0 && (
                                         <div className="flex flex-col gap-2 min-w-[240px]">
                                             <div className="flex items-center gap-2">
                                                 <Building2 className="w-4 h-4 text-primary" />
@@ -410,48 +410,43 @@ export default function PractitionerDashboard({
 
                         {/* Quick Actions Widget */}
                         <div className="lg:col-span-1 bg-white border-2 border-primary/30 rounded-xl p-6 shadow-md">
-                            <div className="text-center mb-4">
-                                <h3 className="text-sm font-semibold text-primary mb-1">Quick Actions</h3>
-                                <p className="text-xs text-amber-600 font-medium">
-                                    Common practice management tasks
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                       <Link
-                    href={isCentral ? '/central/appointments' : '/appointments'}
-                    className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
-                    >
-                                    <Users className="w-5 h-5" />
-                                    <span>View Appointments</span>
-                                </Link>
-                                 <Link
-                    href={isCentral ? '/central/calendar' : '/calendar'}
-                    className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
-                    >
-                            {/* <Button variant="outline" className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2"
-                                              
-                                                > */}
-                                                    <Calendar className="w-5 h-5" />
-                                                    <span>Schedule</span>
-                                                {/* </Button> */}
-                    </Link>
-                              
-                                 <Link
-                    href={isCentral ? '/central/my-details' : '/invoices'}
-                    className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
-                    >
-                                    <FileText className="w-5 h-5" />
-                                    <span>{isCentral ? 'My details' : 'Invoices'}</span>
-                                </Link>
-                                <Link
-                                    href={isCentral ? '/central/personal-information' : '/attendance-logs'}
-                                    className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
-                                >
+                        <div className="text-center mb-4">
+                            <h3 className="text-sm font-semibold text-primary mb-1">Quick Actions</h3>
+                            <p className="text-xs text-amber-600 font-medium">
+                                Common practice management tasks
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <Link
+                                href={isCentral ? '/central/appointments' : '/appointments'}
+                                className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
+                            >
+                                <Users className="w-5 h-5" />
+                                <span>View Appointments</span>
+                            </Link>
+                            <Link
+                                href={isCentral ? '/central/calendar' : '/calendar'}
+                                className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
+                            >
+                                <Calendar className="w-5 h-5" />
+                                <span>Schedule</span>
+                            </Link>
+                            <Link
+                                href={isCentral ? '/central/my-details' : '/invoices'}
+                                className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
+                            >
+                                <FileText className="w-5 h-5" />
+                                <span>{isCentral ? 'My details' : 'Invoices'}</span>
+                            </Link>
+                            <Link
+                                href={isCentral ? '/central/personal-information' : '/attendance-logs'}
+                                className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
+                            >
                                 <ClipboardList className="w-5 h-5" />
                                 <span>{isCentral ? 'Personal Information' : 'Attendance Logs'}</span>
-                                </Link>
-                            </div>
+                            </Link>
                         </div>
+                    </div>
                     </div>
 
 

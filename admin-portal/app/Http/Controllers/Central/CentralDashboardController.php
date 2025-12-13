@@ -25,6 +25,11 @@ class CentralDashboardController extends Controller
      */
     public function getDashboardData()
     {
+        // Ensure user is authenticated
+        if (!auth()->check()) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
         try {
             // Total Tenants
             $totalTenants = Tenant::count();

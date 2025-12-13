@@ -410,6 +410,18 @@ class AuthenticatedSessionController extends Controller
         $globalLogoutService = app(GlobalLogoutService::class);
         $globalLogoutService->clearGlobalLogoutFlag($user->email);
 
+        // STRICT VALIDATION: Admin portal only allows users with NO tenants
+        // Users with tenants should use tenant-specific login pages
+        if ($user->tenants()->exists()) {
+            Auth::logout();
+            Session::invalidate();
+            Session::regenerateToken();
+            session()->forget('login_intent');
+
+            return redirect()->route('admin.login')
+                ->withErrors(['email' => 'This account is associated with tenant(s). Please use the appropriate tenant login page.']);
+        }
+
         // Admin login: NO requirement for practitioner/patient table entries
         // Users can be practitioners in one tenant and regular users in another
         // Check if user is a practitioner (for role assignment in tenants)
@@ -718,6 +730,19 @@ class AuthenticatedSessionController extends Controller
 
         // Clear global logout flag when user logs in
         app(GlobalLogoutService::class)->clearGlobalLogoutFlag($user->email);
+
+        // STRICT VALIDATION: Admin portal only allows users with NO tenants
+        // Users with tenants should use tenant-specific login pages
+        if ($intent === 'admin' && $user->tenants()->exists()) {
+            Auth::logout();
+            Session::invalidate();
+            Session::regenerateToken();
+            session()->forget('login_intent');
+            session()->forget('2fa_passed');
+
+            return redirect()->route('admin.login')
+                ->withErrors(['email' => 'This account is associated with tenant(s). Please use the appropriate tenant login page.']);
+        }
 
         // Clear intent from session after use
         session()->forget('login_intent');

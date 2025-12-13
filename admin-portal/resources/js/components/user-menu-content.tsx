@@ -19,7 +19,7 @@ interface UserMenuContentProps {
 export function UserMenuContent({ user }: UserMenuContentProps) {
     const cleanup = useMobileNavigation();
     const { props } = usePage<CustomPageProps>();
-    const currentUser = props.auth.user;
+    const currentUser = props.auth?.user;
 
     return (
         <>

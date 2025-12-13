@@ -632,24 +632,24 @@ const joinUrl = (...parts: string[]) =>
                                             <Calendar className="w-5 h-5" />
                                             <span>Book Appointment</span>
                                         </Button>
-                                         <Link
-                                                            href={isCentral ? '/central/calendar' : '/calendar'}
-                                                            className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
-                                                            >
+                                        <Link
+                                            href={isCentral ? '/central/calendar' : '/calendar'}
+                                            className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
+                                        >
                                             <FileText className="w-5 h-5" />
                                             <span>Schedule</span>
                                         </Link>
-                                       <Link
-                                                            href={isCentral ? '/central/my-details/health-history' : '/my-details'}
-                                                            className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
-                                                            >
+                                        <Link
+                                            href={isCentral ? '/central/my-details/health-history' : '/my-details'}
+                                            className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
+                                        >
                                             <User className="w-5 h-5" />
                                             <span>{isCentral ? 'Update profile' : 'My details'}</span>
                                         </Link>
-                                         <Link
-                                                            href={isCentral ? '/central/appointments' : '/appointments'}
-                                                            className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
-                                                            >
+                                        <Link
+                                            href={isCentral ? '/central/appointments' : '/appointments'}
+                                            className="h-12 text-xs font-medium border-primary text-primary hover:bg-primary hover:text-primary-foreground flex-col gap-1 p-2 inline-flex items-center justify-center rounded-md border"
+                                        >
                                             <FileText className="w-5 h-5" />
                                             <span>Appointments</span>
                                         </Link>

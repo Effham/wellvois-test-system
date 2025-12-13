@@ -25,10 +25,12 @@ interface LoginProps {
     status?: string;
     canResetPassword: boolean;
     tenant: string | null;
+    tenantLogo?: string | null;
     intent?: 'practitioner' | 'patient';
+    isTenantLogin?: boolean;
 }
 
-export default function Login({ status, canResetPassword, tenant, intent }: LoginProps) {
+export default function Login({ status, canResetPassword, tenant, tenantLogo, intent, isTenantLogin }: LoginProps) {
     // App portal uses tenant-specific login - no intent needed
     const { data, setData, post, processing, errors, reset } = useForm<Required<LoginForm>>({
         email: '',
@@ -64,27 +66,51 @@ export default function Login({ status, canResetPassword, tenant, intent }: Logi
         setShowPassword(!showPassword);
     };
 
+    // Determine if this is a tenant-specific login
+    const isTenantLoginPage = isTenantLogin === true;
+
     return (
         <OnboardingLayout title="Log in" contentClassName="max-w-md">
             <div className="w-full">
                 {/* Header Section */}
                 <div className="mb-6 text-center">
+                    {/* Logo - Show above company name for tenant login */}
+                    {isTenantLoginPage && tenantLogo && (
+                        <div className="mb-4 flex justify-center">
+                            <img 
+                                src={tenantLogo} 
+                                alt={`${tenant} logo`}
+                                className="h-16 sm:h-20 w-auto object-contain"
+                            />
+                        </div>
+                    )}
+                    
                     <div className="flex items-center justify-center gap-3 mb-3">
-                        {intent === 'practitioner' ? (
-                            <Stethoscope className="h-6 w-6 text-purple-600" />
-                        ) : (
-                            <User className="h-6 w-6 text-blue-600" />
+                        {!isTenantLoginPage && (
+                            <>
+                                {intent === 'practitioner' ? (
+                                    <Stethoscope className="h-6 w-6 text-purple-600" />
+                                ) : (
+                                    <User className="h-6 w-6 text-blue-600" />
+                                )}
+                            </>
                         )}
                         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                            {intent === 'practitioner' ? 'Practitioner Login' : 'Patient Login'}
+                            {isTenantLoginPage && tenant 
+                                ? tenant // Just show company name, no "Login"
+                                : intent === 'practitioner' 
+                                    ? 'Practitioner Login' 
+                                    : 'Patient Login'}
                         </h1>
                     </div>
                     <p className="text-gray-600 text-sm sm:text-base">
-                        {tenant 
+                        {isTenantLoginPage && tenant
                             ? `Enter your credentials to access ${tenant}`
-                            : intent === 'practitioner'
-                                ? 'Enter your credentials to access your practitioner account.'
-                                : 'Enter your credentials to access your patient account.'}
+                            : tenant 
+                                ? `Enter your credentials to access ${tenant}`
+                                : intent === 'practitioner'
+                                    ? 'Enter your credentials to access your practitioner account.'
+                                    : 'Enter your credentials to access your patient account.'}
                     </p>
                 </div>
                 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Mail\UserSessionActivityMail;
+use App\Models\OrganizationSetting;
 use App\Models\Tenant;
 use App\Models\Tenant\PatientInvitation;
 use App\Models\User;
@@ -119,14 +120,33 @@ class AuthenticatedSessionController extends Controller
             session(['document_access_token' => $request->query('document_access_token')]);
         }
 
-        // Get tenant information
-        $tenant = tenant();
-        $tenantName = $tenant ? ($tenant->company_name ?? Str::title($tenant->id)) : 'Tenant';
+        // Get tenant company name
+        $tenantName = tenant()->company_name ?? 'Tenant';
+
+        // Get organization logo if available
+        $logoUrl = null;
+        try {
+            $appearanceSettings = OrganizationSetting::getByPrefix('appearance_');
+            $logoS3Key = $appearanceSettings['appearance_logo_s3_key'] ?? null;
+
+            if (!empty($logoS3Key)) {
+                $tenantId = tenant('id');
+                $cacheBuster = substr(md5($logoS3Key), 0, 8);
+                $logoUrl = url("/logo-proxy/{$tenantId}?v={$cacheBuster}");
+            }
+        } catch (\Exception $e) {
+            // Silently handle if organization_settings table doesn't exist or logo not configured
+            Log::debug('Could not fetch organization logo for tenant login', [
+                'tenant_id' => tenant('id'),
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return Inertia::render('auth/login', [
             'canResetPassword' => Route::has('password.request'),
             'status' => $request->session()->get('status'),
             'tenant' => $tenantName,
+            'tenantLogo' => $logoUrl,
             'isTenantLogin' => true,
         ]);
     }

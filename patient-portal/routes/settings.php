@@ -21,6 +21,11 @@ Route::middleware('auth')->group(function () {
             $queryParams['walkthrough'] = 'true';
         }
 
+        // Patient portal: For users without tenants, redirect to profile settings
+        if (!$user->tenants()->exists()) {
+            return redirect()->route('profile.edit', $queryParams);
+        }
+
         // Check permissions in priority order matching the sidebar
         if ($user->hasPermissionTo('view-organization')) {
             return redirect()->route('settings.organization', $queryParams);
@@ -40,7 +45,7 @@ Route::middleware('auth')->group(function () {
 
         // If user has no settings permissions, redirect to dashboard with error
         return redirect()->route('dashboard')->with('error', 'You do not have permission to access settings.');
-    })->name('settings.index')->middleware('require-tenant');
+    })->name('settings.index');
 
     // Individual settings pages
     // Organization settings with deferred loading support
