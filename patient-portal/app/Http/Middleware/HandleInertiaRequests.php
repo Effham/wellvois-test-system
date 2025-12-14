@@ -75,6 +75,48 @@ class HandleInertiaRequests extends Middleware
             $centralUserId = $centralUser?->id;
         }
 
+        // Check if user has Keycloak session (even if not authenticated in Laravel)
+        // This allows showing Keycloak user menu on login page
+        $keycloakLoggedIn = false;
+        $keycloakUserInfo = null;
+        $keycloakAccessToken = session('keycloak_access_token');
+        
+        if ($keycloakAccessToken) {
+            try {
+                $keycloakService = app(\App\Services\KeycloakService::class);
+                $userInfo = $keycloakService->getUserInfo($keycloakAccessToken);
+                if ($userInfo) {
+                    $keycloakLoggedIn = true;
+                    $userName = trim(($userInfo['given_name'] ?? '') . ' ' . ($userInfo['family_name'] ?? '')) ?: ($userInfo['name'] ?? 'User');
+                    $userEmail = $userInfo['email'] ?? null;
+                    
+                    // If Laravel user exists, prefer Laravel user name/email as fallback
+                    if ($request->user()) {
+                        $userName = $userName ?: $request->user()->name;
+                        $userEmail = $userEmail ?: $request->user()->email;
+                    }
+                    
+                    $keycloakUserInfo = [
+                        'name' => $userName,
+                        'email' => $userEmail,
+                    ];
+                } else {
+                    // Token invalid, clear it
+                    session()->forget('keycloak_access_token');
+                    session()->forget('keycloak_refresh_token');
+                }
+            } catch (\Exception $e) {
+                // Log error for debugging
+                \Illuminate\Support\Facades\Log::warning('Keycloak user info check failed', [
+                    'error' => $e->getMessage(),
+                    'has_token' => !empty($keycloakAccessToken),
+                ]);
+                // Clear invalid token from session
+                session()->forget('keycloak_access_token');
+                session()->forget('keycloak_refresh_token');
+            }
+        }
+
         $sharedData = [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -82,6 +124,15 @@ class HandleInertiaRequests extends Middleware
             'csrf_token' => csrf_token(),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'centralAppUrl' => $centralAppUrl, // Expose central app URL to frontend
+            'keycloak' => [
+                'logged_in' => $keycloakLoggedIn,
+                'user' => $keycloakUserInfo,
+                'base_url' => config('keycloak.base_url'),
+                'realm' => config('keycloak.realm'),
+                'account_management_url' => $keycloakLoggedIn 
+                    ? config('keycloak.base_url') . '/realms/' . config('keycloak.realm') . '/account'
+                    : null,
+            ],
             'auth' => [
                 'user' => $request->user()
                     ? array_merge(

@@ -657,6 +657,12 @@ foreach (config('tenancy.central_domains') as $domain) {
         require __DIR__.'/auth.php';
         require __DIR__.'/diagnostic-routes.php';
 
+        // Keycloak user info route
+        Route::get('/api/keycloak/user-info', [\App\Http\Controllers\KeycloakUserController::class, 'getUserInfo'])->name('keycloak.user-info');
+        
+        // Keycloak logout callback route
+        Route::get('/logged-out', [\App\Http\Controllers\KeycloakUserController::class, 'loggedOut'])->name('keycloak.logged-out');
+
         // Guest-only routes (register, login, etc.) - protected by central-guest middleware
         Route::middleware('central-guest')->group(function () {
             Route::get('/register', function (\Illuminate\Http\Request $request) {

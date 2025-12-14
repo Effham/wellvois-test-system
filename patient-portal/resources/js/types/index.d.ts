@@ -33,6 +33,16 @@ export interface SharedData {
     sidebarOpen: boolean;
     flash: FlashProps;
     centralAppUrl: string; // Add centralAppUrl to SharedData
+    keycloak?: {
+        logged_in: boolean;
+        user?: {
+            name: string;
+            email: string;
+        };
+        base_url?: string;
+        realm?: string;
+        account_management_url?: string | null;
+    };
     // Any other shared data from HandleInertiaRequests
     [key: string]: unknown;
 }

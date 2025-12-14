@@ -11,7 +11,7 @@ return [
     */
 
     'base_url' => env('KEYCLOAK_BASE_URL', 'http://localhost:8080'),
-    'realm' => env('KEYCLOAK_REALM', 'atc'),
+    'realm' => env('KEYCLOAK_REALM', 'dev'),
     'client_id' => env('KEYCLOAK_CLIENT_ID', 'admin-portal'),
     'client_secret' => env('KEYCLOAK_CLIENT_SECRET', ''),
     'redirect_uri' => env('KEYCLOAK_REDIRECT_URI', 'http://localhost:8003/auth/keycloak/callback'),
