@@ -3,6 +3,7 @@
 use App\Http\Middleware\CanAccessTenant;
 use App\Http\Middleware\CentralGuestAccess;
 use App\Http\Middleware\CheckGlobalLogout;
+use App\Http\Middleware\CheckKeycloakSession;
 use App\Http\Middleware\EnsureOnboardingComplete;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -53,6 +54,7 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
             CheckGlobalLogout::class,
             \App\Http\Middleware\EnforceAbsoluteSessionTimeout::class,
+            CheckKeycloakSession::class, // Check Keycloak session validity
             RequireBillingSetup::class, // Check if user needs to complete billing setup
             EnsureOnboardingComplete::class, // Check if onboarding is complete
         ]);

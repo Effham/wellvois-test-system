@@ -2,8 +2,8 @@ import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSep
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { type User, SharedData } from '@/types';
-import { Link, router, usePage } from '@inertiajs/react';
-import { LogOut, Settings, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { router, usePage } from '@inertiajs/react';
+import { LogOut, Settings, User as UserIcon } from 'lucide-react';
 
 interface CustomPageProps extends SharedData {
     auth: {
@@ -30,48 +30,47 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
+                {/* Profile - Redirect to Keycloak Account Management */}
                 <DropdownMenuItem asChild>
-                    <Link href={route('profile.edit')} className="block w-full" as="button" prefetch onClick={cleanup}>
-                        <UserIcon className="mr-2" />
-                        Profile
-                    </Link>
-                </DropdownMenuItem>
-
-                <DropdownMenuItem asChild>
-                    <Link href={route('settings.index')} className="block w-full" as="button" prefetch onClick={cleanup}>
-                        <Settings className="mr-2" />
-                        Settings
-                    </Link>
-                </DropdownMenuItem>
-
-        {/* TWO FACTOR AUTH */}
-            <DropdownMenuItem asChild>
-                {currentUser.tenancy?.is_central ? (
-                    <Link className="block w-full" href={route('two-factor-authentication.setup')} as="button" prefetch onClick={cleanup}>
-                        <ShieldCheck className="mr-2" />
-                        2 Step Verification
-                    </Link>
-                ) : (
-                    <button 
-                        className="flex items-center w-full px-2 py-1.5 text-sm" 
+                    <button
+                        className="flex items-center w-full px-2 py-1.5 text-sm"
                         onClick={() => {
                             cleanup();
-                            const centralAppUrl = props.centralAppUrl;
-                            // The target central route to redirect to after SSO
-                            const targetCentralRoute = route('two-factor-authentication.setup', {}, false); // Get raw path without encoding
-                            
-                            // Construct the URL to the new central-redirect route.
-                            // Let Ziggy encode the `redirect` query parameter once.
-                            const ssoCentralRedirectUrl = `${centralAppUrl}${route('sso.central-redirect', { redirect: targetCentralRoute }, false)}`;
-                            
-                            window.location.href = ssoCentralRedirectUrl;
+                            // Redirect to Keycloak account management
+                            const keycloakAccountUrl = props.keycloak?.account_management_url;
+                            if (keycloakAccountUrl) {
+                                window.open(keycloakAccountUrl, '_blank');
+                            } else {
+                                // Fallback to Laravel profile if Keycloak URL not available
+                                router.visit(route('profile.edit'));
+                            }
                         }}
                     >
-                        <ShieldCheck className="mr-2" />
-                        2 Step Verification
+                        <UserIcon className="mr-2" />
+                        Profile
                     </button>
-                )}
-            </DropdownMenuItem>
+                </DropdownMenuItem>
+
+                {/* Settings - Redirect to Keycloak Account Management for account settings */}
+                <DropdownMenuItem asChild>
+                    <button
+                        className="flex items-center w-full px-2 py-1.5 text-sm"
+                        onClick={() => {
+                            cleanup();
+                            // Redirect to Keycloak account management for password, MFA, etc.
+                            const keycloakAccountUrl = props.keycloak?.account_management_url;
+                            if (keycloakAccountUrl) {
+                                window.open(keycloakAccountUrl, '_blank');
+                            } else {
+                                // Fallback to Laravel settings if Keycloak URL not available
+                                router.visit(route('settings.index'));
+                            }
+                        }}
+                    >
+                        <Settings className="mr-2" />
+                        Account Settings
+                    </button>
+                </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
@@ -81,26 +80,35 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
                         e.preventDefault();
                         cleanup();
 
-                        // Clear Inertia page cache to prevent back-button issues
-                        if (router.clearHistory) {
-                            router.clearHistory();
-                        }
-
-                        // Use POST method with replace to prevent back-button navigation
-                        router.post(route('logout'), {}, {
-                            preserveState: false,
-                            preserveScroll: false,
-                            replace: true, // Replace history entry instead of adding new one
-                            onSuccess: () => {
-                                // Force full page reload to clear all state
-                                window.location.href = route('login');
-                            },
-                            onError: (errors) => {
-                                console.error('Logout failed:', errors);
-                                // Fallback: force navigation even on error
-                                window.location.href = route('login');
+                        // If user is logged into Keycloak, use Keycloak logout
+                        // This will log them out of Keycloak and automatically log them out of Laravel
+                        if (props.keycloak?.logged_in) {
+                            const keycloakBaseUrl = props.keycloak?.base_url || 'http://localhost:8080';
+                            const realm = props.keycloak?.realm || 'dev';
+                            const redirectUri = encodeURIComponent(window.location.origin + '/logged-out');
+                            const logoutUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/logout?redirect_uri=${redirectUri}`;
+                            window.location.href = logoutUrl;
+                        } else {
+                            // Fallback to Laravel logout if not logged into Keycloak
+                            // Clear Inertia page cache to prevent back-button issues
+                            if (router.clearHistory) {
+                                router.clearHistory();
                             }
-                        });
+
+                            // Use POST method with replace to prevent back-button navigation
+                            router.post(route('logout'), {}, {
+                                preserveState: false,
+                                preserveScroll: false,
+                                replace: true,
+                                onSuccess: () => {
+                                    window.location.href = route('login');
+                                },
+                                onError: (errors) => {
+                                    console.error('Logout failed:', errors);
+                                    window.location.href = route('login');
+                                }
+                            });
+                        }
                     }}
                 >
                     <LogOut className="mr-2" />

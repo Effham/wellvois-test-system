@@ -662,6 +662,9 @@ foreach (config('tenancy.central_domains') as $domain) {
         // Keycloak callback route - must be on central domain (not tenant domain)
         // This allows Keycloak to redirect to a fixed URL without wildcards
         Route::get('/auth/keycloak/callback', [KeycloakController::class, 'callback'])->name('keycloak.callback');
+        
+        // Keycloak logout callback route (stays on central domain)
+        Route::get('/logged-out', [\App\Http\Controllers\KeycloakUserController::class, 'loggedOut'])->name('keycloak.logged-out');
 
         // Guest-only routes (register, login, etc.) - protected by central-guest middleware
         Route::middleware('central-guest')->group(function () {

@@ -9,6 +9,7 @@ use App\Services\KeycloakService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -291,10 +292,25 @@ class KeycloakController extends Controller
                 ->withErrors(['keycloak' => 'Tenant domain not configured. Please contact support.']);
         }
         
+        // Extract Keycloak tokens from OAuth response
+        // These will be passed through SSO to tenant domain session
+        $keycloakTokens = [
+            'access_token' => $tokens['access_token'] ?? null,
+            'refresh_token' => $tokens['refresh_token'] ?? null,
+        ];
+        
+        // Log token information (without exposing full tokens)
+        Log::info('Keycloak: Preparing tokens for SSO transfer', [
+            'has_access_token' => !empty($keycloakTokens['access_token']),
+            'has_refresh_token' => !empty($keycloakTokens['refresh_token']),
+            'access_token_length' => $keycloakTokens['access_token'] ? strlen($keycloakTokens['access_token']) : 0,
+            'tenant_id' => $tenantId,
+        ]);
+        
         // Generate SSO code for cross-domain authentication
-        // This will authenticate the user on the tenant domain that initiated the login
+        // Include Keycloak tokens in SSO data so they're available on tenant domain
         $ssoService = app(\App\Services\SecureSSOService::class);
-        $ssoCode = $ssoService->generateSSOCode($centralUser, $tenant, '/dashboard');
+        $ssoCode = $ssoService->generateSSOCode($centralUser, $tenant, '/dashboard', null, null, $keycloakTokens);
         $ssoUrl = $ssoService->generateTenantSSOUrl($ssoCode, $tenant);
         
         Log::info('Keycloak: Generated SSO code for tenant authentication', [
@@ -303,7 +319,9 @@ class KeycloakController extends Controller
             'tenant_id' => $tenantId,
             'tenant_domain' => $tenantDomain->domain,
             'sso_url' => $ssoUrl,
-            'note' => 'Redirecting back to the tenant that initiated login',
+            'sso_code' => $ssoCode,
+            'has_keycloak_tokens' => !empty($keycloakTokens['access_token']),
+            'note' => 'Redirecting back to the tenant that initiated login with Keycloak tokens',
         ]);
 
         // End tenancy before redirect (redirect will be handled on tenant domain)

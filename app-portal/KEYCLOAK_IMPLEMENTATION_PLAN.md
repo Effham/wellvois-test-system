@@ -738,6 +738,144 @@ KEYCLOAK_REDIRECT_URI=http://localhost:8000/auth/keycloak/callback
 - ✅ Keycloak users created via Admin API
 - ✅ Password stored securely (hashed in Laravel, plain in Keycloak)
 
+## Keycloak User Menu and Session Management
+
+### Overview
+When users are logged into Keycloak, they can access their Keycloak account management features directly from the application. This includes password changes, multi-factor authentication setup, and other security settings managed by Keycloak.
+
+### Keycloak User Menu Component
+
+**Location**: `resources/js/components/keycloak-user-menu.tsx`
+
+The Keycloak user menu appears in the top-right corner of login and onboarding layouts when a user is logged into Keycloak (but not necessarily logged into the Laravel application).
+
+**Features**:
+- Shows user avatar with initials
+- Displays user name and email
+- Provides quick access to:
+  - **Manage Profile**: Opens Keycloak account management page
+  - **Change Password**: Opens Keycloak password change page
+  - **Security Settings**: Opens Keycloak security settings (MFA, etc.)
+  - **Logout from WELLOVIS**: Logs out from Keycloak (which also logs out from Laravel)
+
+**Visibility**:
+- Only shown when user has an active Keycloak session
+- Uses `props.keycloak.logged_in` to determine visibility
+- Automatically hides if Keycloak session expires
+
+### Keycloak Session Detection
+
+**Backend**: `app/Http/Middleware/HandleInertiaRequests.php`
+
+The middleware checks if the user has a valid Keycloak session by:
+1. Checking if `keycloak_access_token` exists in session
+2. Calling Keycloak userinfo endpoint to verify token validity
+3. Sharing Keycloak user info with frontend via Inertia props
+
+**Shared Data Structure**:
+```php
+'keycloak' => [
+    'logged_in' => bool,
+    'user' => [
+        'name' => string,
+        'email' => string,
+    ],
+    'account_management_url' => string|null,
+]
+```
+
+### Keycloak Logout Flow
+
+**Logout Route**: `/logged-out` (configured in Keycloak client settings)
+
+**Flow**:
+1. User clicks "Logout from WELLOVIS" in Keycloak user menu
+2. Application redirects to Keycloak logout endpoint with `redirect_uri=/logged-out`
+3. Keycloak logs out the user and redirects back to `/logged-out`
+4. `KeycloakUserController::loggedOut()` handles the callback:
+   - Clears Keycloak tokens from Laravel session
+   - Logs out Laravel user if authenticated
+   - Invalidates and regenerates session
+   - Redirects to login page
+
+**Controller**: `app/Http/Controllers/KeycloakUserController.php`
+
+### Session Validation Middleware
+
+**Location**: `app/Http/Middleware/CheckKeycloakSession.php`
+
+This middleware validates Keycloak sessions on page refresh:
+- Only runs on full page loads (not AJAX/Inertia requests)
+- Checks if user has `keycloak_access_token` in session
+- Verifies token validity by calling Keycloak userinfo endpoint
+- If token is invalid/expired:
+  - Clears Keycloak tokens from session
+  - Logs out Laravel user
+  - Redirects to login page with message
+
+**Performance**:
+- Only checks on page refresh (not every request)
+- Skips check for AJAX/Inertia/API requests
+- Handles network errors gracefully (doesn't log out on temporary failures)
+
+### User Menu Updates
+
+**Location**: `resources/js/components/user-menu-content.tsx`
+
+**Changes**:
+1. **Removed Two-Factor Authentication Menu Item**: 2FA is now managed entirely through Keycloak
+2. **Profile Menu**: Redirects to Keycloak account management page (if logged into Keycloak)
+3. **Account Settings Menu**: Redirects to Keycloak account management page for password, MFA, etc.
+4. **Logout**: Uses Keycloak logout endpoint if user is logged into Keycloak
+
+**Fallback Behavior**:
+- If Keycloak URL not available, falls back to Laravel routes
+- Maintains backward compatibility for users not using Keycloak
+
+### Layout Updates
+
+**Location**: `resources/js/components/onboarding-layout.tsx`
+
+**Changes**:
+- Added Keycloak user menu in top-right corner
+- Positioned alongside app logo (top-left)
+- Only visible when user is logged into Keycloak
+
+### Keycloak Account Management URL
+
+The account management URL is constructed as:
+```
+{KEYCLOAK_BASE_URL}/realms/{KEYCLOAK_REALM}/account
+```
+
+This URL provides access to:
+- Profile management
+- Password changes
+- Multi-factor authentication setup
+- Security settings
+- Session management
+- Account deletion
+
+### Integration Points
+
+1. **Login Page**: Shows Keycloak user menu if user is logged into Keycloak but not Laravel
+2. **Onboarding Layout**: Shows Keycloak user menu on all pages using this layout
+3. **App Header**: User menu redirects to Keycloak for account management
+4. **Session Validation**: Middleware ensures Keycloak session validity
+
+### Files Changed
+
+1. `app/Http/Controllers/KeycloakUserController.php` - New controller for user info and logout
+2. `app/Http/Middleware/CheckKeycloakSession.php` - New middleware for session validation
+3. `app/Http/Middleware/HandleInertiaRequests.php` - Added Keycloak user info to shared data
+4. `app/Http/Controllers/Auth/AuthenticatedSessionController.php` - Updated logout to clear Keycloak tokens
+5. `resources/js/components/keycloak-user-menu.tsx` - New component for Keycloak user menu
+6. `resources/js/components/onboarding-layout.tsx` - Added Keycloak user menu
+7. `resources/js/components/user-menu-content.tsx` - Removed 2FA, updated Profile/Settings to redirect to Keycloak
+8. `resources/js/types/index.d.ts` - Added Keycloak type to SharedData
+9. `routes/web.php` - Added Keycloak user info and logout routes
+10. `bootstrap/app.php` - Registered CheckKeycloakSession middleware
+
 ## Notes
 
 - This implementation maintains backward compatibility with existing Laravel authentication
@@ -746,4 +884,7 @@ KEYCLOAK_REDIRECT_URI=http://localhost:8000/auth/keycloak/callback
 - Keycloak is purely used for authentication, not authorization
 - Sessions are domain-specific, requiring SSO flow for cross-domain authentication
 - Cache is used for state management to enable cross-domain validation
+- Keycloak user menu only appears when user has active Keycloak session
+- Two-factor authentication is now managed entirely through Keycloak
+- Account settings redirect to Keycloak account management page
 

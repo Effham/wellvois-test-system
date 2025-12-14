@@ -70,6 +70,15 @@ Route::middleware([
     //     return 'This is your multi-tenant application. The id of the current tenant is ' . tenant('id');
     // });
 
+    // Keycloak user info route (accessible from tenant domains)
+    // This allows the frontend to check Keycloak session status on tenant domains
+    Route::get('/api/keycloak/user-info', [\App\Http\Controllers\KeycloakUserController::class, 'getUserInfo'])->name('keycloak.user-info');
+    
+    // Keycloak logout callback route (accessible from tenant domains)
+    // This handles Keycloak's post-logout redirect when users log out from tenant domains
+    // Note: This route must be accessible without authentication (user is logging out)
+    Route::get('/logged-out', [\App\Http\Controllers\KeycloakUserController::class, 'loggedOut'])->name('keycloak.logged-out.tenant');
+
     // Secure SSO: Initial code reception (non-side-effecting GET)
     Route::get('/sso/start', function (Request $request) {
         $code = $request->query('code');
@@ -188,6 +197,29 @@ Route::middleware([
                 'document_ids' => $userData['document_ids_filter'],
                 'user_id' => $user->id,
                 'tenant_id' => tenant('id'),
+            ]);
+        }
+
+        // Store Keycloak tokens if present in SSO data
+        // These tokens allow the frontend to check Keycloak session status and show user menu
+        if (! empty($userData['keycloak_access_token'])) {
+            session([
+                'keycloak_access_token' => $userData['keycloak_access_token'],
+                'keycloak_refresh_token' => $userData['keycloak_refresh_token'] ?? null,
+            ]);
+            Log::info('🔑 Keycloak tokens restored from SSO to tenant session', [
+                'user_id' => $user->id,
+                'tenant_id' => tenant('id'),
+                'has_access_token' => !empty($userData['keycloak_access_token']),
+                'has_refresh_token' => !empty($userData['keycloak_refresh_token']),
+                'access_token_length' => strlen($userData['keycloak_access_token'] ?? ''),
+            ]);
+        } else {
+            Log::warning('⚠️ SSO data does not contain Keycloak tokens', [
+                'user_id' => $user->id,
+                'tenant_id' => tenant('id'),
+                'sso_data_keys' => array_keys($userData),
+                'has_keycloak_access_token' => isset($userData['keycloak_access_token']),
             ]);
         }
 

@@ -26,6 +26,11 @@ class EnsureOnboardingComplete
             return $next($request);
         }
 
+        // Skip middleware for Keycloak logout callback
+        if ($request->routeIs('keycloak.logged-out') || $request->path() === 'logged-out') {
+            return $next($request);
+        }
+
         // Skip onboarding check on central domains (onboarding is tenant-specific only)
         $isCentralDomain = in_array($request->getHost(), config('tenancy.central_domains', []));
         if ($isCentralDomain) {

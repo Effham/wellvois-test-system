@@ -56,7 +56,9 @@ class RequireBillingSetup
             $request->routeIs('register') ||
             $request->routeIs('password.*') ||
             $request->routeIs('sso.central-redirect') ||
-            $request->path() === 'sso/central-redirect'
+            $request->routeIs('keycloak.logged-out') ||
+            $request->path() === 'sso/central-redirect' ||
+            $request->path() === 'logged-out'
         ) {
             \Illuminate\Support\Facades\Log::info('RequireBillingSetup: Route excluded from billing check', [
                 'route_name' => $routeName,

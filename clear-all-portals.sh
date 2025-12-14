@@ -46,3 +46,4 @@ echo -e "${GREEN}All portal caches cleared!${NC}"
 echo ""
 echo -e "${YELLOW}Note: You may want to run 'php artisan config:cache' and 'php artisan route:cache' in production${NC}"
 
+

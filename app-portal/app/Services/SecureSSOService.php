@@ -18,7 +18,7 @@ class SecureSSOService
     /**
      * Generate a secure one-time code for SSO
      */
-    public function generateSSOCode(User $user, Tenant $tenant, string $redirectPath = '/dashboard', ?string $sessionId = null, ?array $documentIdsFilter = null): string
+    public function generateSSOCode(User $user, Tenant $tenant, string $redirectPath = '/dashboard', ?string $sessionId = null, ?array $documentIdsFilter = null, ?array $keycloakTokens = null): string
     {
         // Generate cryptographically secure random code
         $code = Str::random(64);
@@ -38,6 +38,8 @@ class SecureSSOService
             'tenant_name' => $tenant->company_name ?? $tenant->id,
             '2fa_passed' => session('2fa_passed', false), // Store 2FA status
             'document_ids_filter' => $documentIdsFilter, // Store document IDs for filtering
+            'keycloak_access_token' => $keycloakTokens['access_token'] ?? null, // Store Keycloak tokens
+            'keycloak_refresh_token' => $keycloakTokens['refresh_token'] ?? null,
         ];
 
         // Store in cache with TTL
@@ -129,6 +131,7 @@ class SecureSSOService
         Cache::forget($cacheKey);
 
         // Return success payload with user data
+        // Include Keycloak tokens if present in cache data
         return [
             'user_id' => $userId,
             'tenant_id' => $tenantId,
@@ -137,6 +140,8 @@ class SecureSSOService
             'tenant_name' => $cacheData['tenant_name'],
             '2fa_passed' => $cacheData['2fa_passed'] ?? false,
             'document_ids_filter' => $cacheData['document_ids_filter'] ?? null,
+            'keycloak_access_token' => $cacheData['keycloak_access_token'] ?? null,
+            'keycloak_refresh_token' => $cacheData['keycloak_refresh_token'] ?? null,
         ];
     }
 

@@ -59,3 +59,4 @@ return [
     'response_type' => 'code',
 ];
 
+

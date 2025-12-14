@@ -4,6 +4,7 @@ import { ReactNode } from 'react';
 import { Head } from '@inertiajs/react';
 import { motion } from 'motion/react';
 import AppLogoIcon from '@/components/app-logo-icon';
+import { KeycloakUserMenu } from '@/components/keycloak-user-menu';
 
 interface OnboardingLayoutProps {
     children: ReactNode;
@@ -413,7 +414,6 @@ export default function OnboardingLayout({
                         />
                     </svg>
                 </div>
-
                 {/* Medical Vital Signs Monitor Display */}
                 <div className="absolute bottom-1/3 right-10 w-64 h-48 opacity-10">
                     <div className="w-full h-full bg-gradient-to-br from-sidebar-accent/20 to-purple-600/10 rounded-lg border border-sidebar-accent/20 p-4">
@@ -712,15 +712,20 @@ export default function OnboardingLayout({
                     <rect x="75" y="60" width="20" height="15" rx="2" fill="rgba(99, 102, 241, 0.15)" stroke="rgba(99, 102, 241, 0.4)" strokeWidth="1.5" className="animate-file-slide" style={{ animationDelay: '1s' }}/>
                 </svg>
             </div>
-
-            {/* Logo - Fixed at top left */}
-            {showLogoProp && (
-                <div className="fixed top-0 left-0 z-50 py-6 pl-6 pointer-events-none">
+            {/* Header - Logo on left, Keycloak user menu on right */}
+            <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-6 pointer-events-none">
+                {/* Logo - Top left */}
+                {showLogoProp && (
                     <div className="pointer-events-auto">
                         <AppLogoIcon className="h-8 w-auto drop-shadow-lg" />
                     </div>
+                )}
+                
+                {/* Keycloak User Menu - Top right */}
+                <div className="pointer-events-auto ml-auto flex items-center justify-end min-w-[40px] z-50"> 
+                    <KeycloakUserMenu />
                 </div>
-            )}
+            </div>
             
             {/* Content Container */}
             <div className="relative z-10 w-full min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">

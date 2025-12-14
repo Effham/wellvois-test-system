@@ -425,6 +425,11 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request)
     {
+        // Clear Keycloak tokens from session
+        session()->forget('keycloak_access_token');
+        session()->forget('keycloak_refresh_token');
+        session()->forget('keycloak_state');
+
         // Use global logout service for comprehensive logout
         $globalLogoutService = app(GlobalLogoutService::class);
         $globalLogoutService->performGlobalLogout($request);
