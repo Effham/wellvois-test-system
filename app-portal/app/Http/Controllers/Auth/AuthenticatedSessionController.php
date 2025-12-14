@@ -142,12 +142,29 @@ class AuthenticatedSessionController extends Controller
             ]);
         }
 
+        // Get Keycloak errors from multiple sources (query param, flash message, session errors)
+        // Query parameter takes priority (most reliable across redirects)
+        $keycloakError = $request->query('keycloak_error')
+            ?? $request->session()->get('keycloak_error')
+            ?? $request->session()->get('errors')?->getBag('default')->get('keycloak');
+        
+        // Extract first error message if it's an array
+        if (is_array($keycloakError)) {
+            $keycloakError = $keycloakError[0] ?? null;
+        }
+        
+        // Clear flash message after reading (one-time use)
+        if ($request->session()->has('keycloak_error')) {
+            $request->session()->forget('keycloak_error');
+        }
+        
         return Inertia::render('auth/login', [
             'canResetPassword' => Route::has('password.request'),
             'status' => $request->session()->get('status'),
             'tenant' => $tenantName,
             'tenantLogo' => $logoUrl,
             'isTenantLogin' => true,
+            'keycloakError' => $keycloakError, // Pass error message
         ]);
     }
 

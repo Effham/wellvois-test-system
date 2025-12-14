@@ -24,30 +24,58 @@ class KeycloakController extends Controller
 
     /**
      * Redirect user to Keycloak authorization endpoint.
+     * 
+     * IMPORTANT: This method extracts the tenant ID from the current tenant domain/subdomain
+     * where the login was initiated. This tenant ID is encoded in the state parameter
+     * and will be used to redirect the user back to the SAME tenant after authentication.
+     * 
+     * We do NOT search for all tenants the user belongs to. We ONLY authenticate for
+     * the specific tenant from which the login was initiated.
      *
      * @return RedirectResponse
      */
     public function redirect(): RedirectResponse
     {
-        // Get current tenant ID (if in tenant context)
+        // Get current tenant ID from the tenant domain/subdomain where login was clicked
+        // Example: If user clicks login on "tenant-name.localhost:8000", this extracts "tenant-name"
         $tenantId = tenant('id');
         
-        // Pass tenant ID to KeycloakService to encode in state parameter
-        // This allows callback (on central domain) to know which tenant to authenticate for
+        if (!$tenantId) {
+            Log::error('Keycloak redirect: No tenant ID found in current context');
+            // Redirect back to login page with error
+            return redirect()->route('login')
+                ->withErrors(['keycloak' => 'Invalid tenant context. Please access login from your tenant domain.']);
+        }
+        
+        // Encode tenant ID in state parameter
+        // This ensures callback redirects back to THIS specific tenant (not searching for user's tenants)
         $authorizationUrl = $this->keycloakService->getAuthorizationUrl(null, $tenantId);
         return redirect($authorizationUrl);
     }
 
     /**
      * Handle Keycloak callback after authentication.
-     * This method performs central->tenant user lookup and tenant access verification.
+     * 
+     * IMPORTANT FLOW:
+     * 1. Extract tenant ID from state parameter (the tenant that initiated login)
+     * 2. Lookup central user by Keycloak user ID
+     * 3. Verify user belongs to THIS SPECIFIC tenant (from state) - NOT searching for all user tenants
+     * 4. If verified, authenticate user for THIS tenant and redirect back to THIS tenant
+     * 5. If not verified, show error and redirect back to THIS tenant's login page
+     * 
+     * We do NOT:
+     * - Search for all tenants the user belongs to
+     * - Show tenant selection screen
+     * - Redirect to a different tenant than the one that initiated login
      *
      * @param Request $request
      * @return RedirectResponse
      */
     public function callback(Request $request): RedirectResponse
     {
-        // Extract tenant ID from state parameter (encoded during redirect)
+        // STEP 1: Extract tenant ID from state parameter
+        // This is the tenant domain/subdomain from which the login was initiated
+        // Example: If login was clicked on "tenant-name.localhost:8000", tenantId = "tenant-name"
         $state = $request->get('state');
         $tenantId = null;
         
@@ -58,7 +86,6 @@ class KeycloakController extends Controller
                     $tenantId = $decodedState['tenant_id'];
                 }
             } catch (\Exception $e) {
-                // State might be plain (for non-tenant contexts), that's okay
                 Log::debug('Keycloak callback: Could not decode tenant ID from state', [
                     'error' => $e->getMessage(),
                 ]);
@@ -67,10 +94,14 @@ class KeycloakController extends Controller
         
         if (!$tenantId) {
             Log::error('Keycloak callback: Missing tenant ID in state parameter');
-            // Redirect to a generic error page or central login
+            // Redirect to central domain with error (we don't know which tenant to redirect to)
             return redirect()->to(config('tenancy.central_domains')[0] ?? 'localhost')
                 ->withErrors(['keycloak' => 'Invalid authentication request. Please try again from your tenant login page.']);
         }
+        
+        Log::info('Keycloak callback: Processing authentication for specific tenant', [
+            'tenant_id' => $tenantId,
+        ]);
 
         // Get tenant and domain early for error redirects
         $tenant = null;
@@ -82,17 +113,22 @@ class KeycloakController extends Controller
             }
         });
 
-        // Helper function to redirect to tenant login page
+        // Helper function to redirect to tenant login page with error
+        // We use both query parameter and flash message to ensure error persists across redirect
         $redirectToTenantLogin = function ($errorMessage) use ($tenantDomain) {
             if ($tenantDomain) {
                 $protocol = app()->environment('production') ? 'https' : 'http';
                 $port = app()->environment('production') ? '' : ':8000';
-                $tenantLoginUrl = "{$protocol}://{$tenantDomain->domain}{$port}/login";
-                return redirect()->to($tenantLoginUrl)->withErrors(['keycloak' => $errorMessage]);
+                // Pass error as query parameter to ensure it persists across redirect
+                $tenantLoginUrl = "{$protocol}://{$tenantDomain->domain}{$port}/login?keycloak_error=" . urlencode($errorMessage);
+                return redirect()->to($tenantLoginUrl)
+                    ->withErrors(['keycloak' => $errorMessage]) // Also set in session as backup
+                    ->with('keycloak_error', $errorMessage); // Flash message as additional backup
             }
             // Fallback to central domain if tenant domain not found
             return redirect()->to(config('tenancy.central_domains')[0] ?? 'localhost')
-                ->withErrors(['keycloak' => $errorMessage]);
+                ->withErrors(['keycloak' => $errorMessage])
+                ->with('keycloak_error', $errorMessage);
         };
 
         // Check for error from Keycloak
@@ -157,7 +193,8 @@ class KeycloakController extends Controller
             return $redirectToTenantLogin('Invalid user information. Please contact support.');
         }
 
-        // STEP 1: Check Keycloak user ID in CENTRAL database
+        // STEP 2: Lookup central user by Keycloak user ID
+        // We search ONLY by keycloak_user_id (not email) to ensure we get the correct user
         $centralUser = null;
         $userEmail = null;
         
@@ -176,25 +213,30 @@ class KeycloakController extends Controller
             return $redirectToTenantLogin('User account not found. Please contact your administrator.');
         }
 
-        // STEP 2: Verify user has access to this tenant via tenant_user table
+        // STEP 3: Verify user has access to THIS SPECIFIC tenant (from state parameter)
+        // We do NOT search for all tenants the user belongs to
+        // We ONLY verify if the user belongs to the tenant that initiated the login
         $hasTenantAccess = false;
         tenancy()->central(function () use (&$hasTenantAccess, $centralUser, $tenantId) {
             $hasTenantAccess = DB::table('tenant_user')
                 ->where('user_id', $centralUser->id)
-                ->where('tenant_id', $tenantId)
+                ->where('tenant_id', $tenantId) // THIS specific tenant from state
                 ->exists();
         });
 
         if (!$hasTenantAccess) {
-            Log::warning('Keycloak callback: User does not have access to tenant', [
+            Log::warning('Keycloak callback: User does not have access to this specific tenant', [
                 'user_id' => $centralUser->id,
                 'email' => $userEmail,
                 'tenant_id' => $tenantId,
+                'note' => 'User attempted to login to tenant they do not belong to',
             ]);
-            return $redirectToTenantLogin('You do not have access to this tenant. Please contact your administrator.');
+            // Clear user-friendly error message explaining the issue
+            return $redirectToTenantLogin('The WELLOVIS account you are logged in with does not have access to this practice. Please contact your administrator or log in with a different account.');
         }
 
-        // STEP 3: Initialize tenancy and find user in TENANT database
+        // STEP 4: Initialize tenancy for THIS SPECIFIC tenant (from state)
+        // We authenticate the user for the tenant that initiated the login, not any other tenant
         if (!$tenant) {
             tenancy()->central(function () use (&$tenant, $tenantId) {
                 $tenant = Tenant::find($tenantId);
@@ -206,10 +248,11 @@ class KeycloakController extends Controller
             return $redirectToTenantLogin('Tenant not found. Please contact support.');
         }
         
-        // Initialize tenancy to access tenant database
+        // Initialize tenancy context for THIS specific tenant database
         tenancy()->initialize($tenant);
         
-        // Find user in TENANT database using email (user must already exist)
+        // STEP 5: Find user in THIS tenant's database using email
+        // User must already exist in this tenant's database (not created during login)
         $tenantUser = User::where('email', $userEmail)->first();
 
         if (!$tenantUser) {
@@ -236,14 +279,11 @@ class KeycloakController extends Controller
             'tenant_id' => $tenantId,
         ]);
 
-        // STEP 4: Use SSO flow to authenticate user on tenant domain
-        // Sessions don't work across domains, so we use SecureSSOService
-        // The SSO flow will authenticate the user on the tenant domain
+        // STEP 6: Generate SSO code and redirect back to THIS SPECIFIC tenant
+        // Sessions don't work across domains, so we use SecureSSOService for cross-domain authentication
+        // We redirect back to the SAME tenant that initiated the login (from state parameter)
         
-        // Store Keycloak tokens temporarily (they'll be available after SSO completes)
-        // Note: These will need to be stored in a way accessible after SSO if needed
-
-        // Get tenant domain for redirect
+        // Get tenant domain for redirect (must be the tenant from state)
         if (!$tenantDomain) {
             tenancy()->end(); // End tenancy before redirect
             Log::error('Keycloak callback: Tenant domain not found', ['tenant_id' => $tenantId]);
@@ -252,6 +292,7 @@ class KeycloakController extends Controller
         }
         
         // Generate SSO code for cross-domain authentication
+        // This will authenticate the user on the tenant domain that initiated the login
         $ssoService = app(\App\Services\SecureSSOService::class);
         $ssoCode = $ssoService->generateSSOCode($centralUser, $tenant, '/dashboard');
         $ssoUrl = $ssoService->generateTenantSSOUrl($ssoCode, $tenant);
@@ -260,13 +301,16 @@ class KeycloakController extends Controller
             'user_id' => $centralUser->id,
             'email' => $userEmail,
             'tenant_id' => $tenantId,
+            'tenant_domain' => $tenantDomain->domain,
             'sso_url' => $ssoUrl,
+            'note' => 'Redirecting back to the tenant that initiated login',
         ]);
 
         // End tenancy before redirect (redirect will be handled on tenant domain)
         tenancy()->end();
 
-        // Redirect to tenant domain via SSO
+        // Redirect to THIS SPECIFIC tenant domain via SSO
+        // This is the tenant from which the login was originally initiated
         return redirect()->to($ssoUrl);
     }
 }

@@ -28,9 +28,10 @@ interface LoginProps {
     tenantLogo?: string | null;
     intent?: 'practitioner' | 'patient';
     isTenantLogin?: boolean;
+    keycloakError?: string | null; // Keycloak-specific error message
 }
 
-export default function Login({ status, canResetPassword, tenant, tenantLogo, intent, isTenantLogin }: LoginProps) {
+export default function Login({ status, canResetPassword, tenant, tenantLogo, intent, isTenantLogin, keycloakError }: LoginProps) {
     const { errors: pageErrors } = usePage().props as any;
     const [isKeycloakRedirecting, setIsKeycloakRedirecting] = useState(false);
 
@@ -132,10 +133,15 @@ export default function Login({ status, canResetPassword, tenant, tenantLogo, in
                             </div>
                         )}
 
-                        {/* Error Message */}
-                        {pageErrors?.keycloak && (
-                            <div className="mb-4 rounded-lg bg-red-50 p-4 text-center text-sm font-medium text-red-600">
-                                {pageErrors.keycloak}
+                        {/* Keycloak Error Message */}
+                        {(keycloakError || pageErrors?.keycloak) && (
+                            <div className="mb-4 rounded-lg bg-red-50 border border-red-200 p-4 text-center text-sm font-medium text-red-700">
+                                <div className="flex items-center justify-center gap-2">
+                                    <svg className="h-5 w-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>{keycloakError || pageErrors?.keycloak}</span>
+                                </div>
                             </div>
                         )}
 
