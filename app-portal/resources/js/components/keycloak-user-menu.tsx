@@ -112,11 +112,24 @@ export function KeycloakUserMenu() {
     const handleLogout = () => {
         setIsLoggingOut(true);
         // Redirect to Keycloak logout endpoint
-        // Keycloak will redirect back to /logged-out after logout
+        // Keycloak will redirect back to central domain /logged-out after logout
+        // We use central domain to avoid needing to configure multiple tenant domains in Keycloak
         const keycloakBaseUrl = keycloakFromProps?.base_url || 'http://localhost:8080';
         const realm = keycloakFromProps?.realm || 'dev';
-        const redirectUri = encodeURIComponent(window.location.origin + '/logged-out');
-        const logoutUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/logout?redirect_uri=${redirectUri}`;
+        const clientId = keycloakFromProps?.client_id || 'app-portal';
+        
+        // Get current origin to determine if we're on tenant or central domain
+        const currentOrigin = window.location.origin;
+        const centralAppUrl = props.centralAppUrl || 'http://localhost:8000';
+        
+        // Use central domain for logout redirect (must match Keycloak client config)
+        // Pass current origin as query param so we can redirect back to tenant login if needed
+        const postLogoutRedirectUri = encodeURIComponent(
+            `${centralAppUrl}/logged-out?from=${encodeURIComponent(currentOrigin)}`
+        );
+        
+        // Include client_id to ensure proper logout session handling
+        const logoutUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/logout?client_id=${clientId}&post_logout_redirect_uri=${postLogoutRedirectUri}`;
         window.location.href = logoutUrl;
     };
 

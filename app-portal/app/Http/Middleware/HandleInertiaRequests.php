@@ -136,6 +136,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $keycloakUserInfo,
                 'base_url' => config('keycloak.base_url'),
                 'realm' => config('keycloak.realm'),
+                'client_id' => config('keycloak.client_id'),
                 'account_management_url' => $keycloakLoggedIn 
                     ? config('keycloak.base_url') . '/realms/' . config('keycloak.realm') . '/account'
                     : null,

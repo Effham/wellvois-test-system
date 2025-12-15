@@ -85,8 +85,18 @@ export function UserMenuContent({ user }: UserMenuContentProps) {
                         if (props.keycloak?.logged_in) {
                             const keycloakBaseUrl = props.keycloak?.base_url || 'http://localhost:8080';
                             const realm = props.keycloak?.realm || 'dev';
-                            const redirectUri = encodeURIComponent(window.location.origin + '/logged-out');
-                            const logoutUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/logout?redirect_uri=${redirectUri}`;
+                            const clientId = props.keycloak?.client_id || 'app-portal';
+                            
+                            // Use central domain for logout redirect (must match Keycloak client config)
+                            // Pass current origin as query param so we can redirect back to tenant login if needed
+                            const currentOrigin = window.location.origin;
+                            const centralAppUrl = props.centralAppUrl || 'http://localhost:8000';
+                            const postLogoutRedirectUri = encodeURIComponent(
+                                `${centralAppUrl}/logged-out?from=${encodeURIComponent(currentOrigin)}`
+                            );
+                            
+                            // Include client_id to ensure proper logout session handling
+                            const logoutUrl = `${keycloakBaseUrl}/realms/${realm}/protocol/openid-connect/logout?client_id=${clientId}&post_logout_redirect_uri=${postLogoutRedirectUri}`;
                             window.location.href = logoutUrl;
                         } else {
                             // Fallback to Laravel logout if not logged into Keycloak

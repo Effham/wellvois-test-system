@@ -41,6 +41,7 @@ export interface SharedData {
         };
         base_url?: string;
         realm?: string;
+        client_id?: string;
         account_management_url?: string | null;
     };
     // Any other shared data from HandleInertiaRequests

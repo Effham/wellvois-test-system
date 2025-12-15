@@ -120,6 +120,7 @@ class KeycloakUserController extends Controller
             'domain' => $request->getHost(),
             'path' => $request->path(),
             'full_url' => $request->fullUrl(),
+            'from_param' => $request->get('from'),
             'tenant_initialized' => tenancy()->initialized,
             'tenant_id' => tenancy()->initialized ? tenant('id') : null,
             'route_name' => $request->route()?->getName(),
@@ -135,6 +136,40 @@ class KeycloakUserController extends Controller
             \Illuminate\Support\Facades\Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
+        }
+
+        // Check if we have a 'from' parameter indicating the original tenant domain
+        $fromOrigin = $request->get('from');
+        
+        if ($fromOrigin) {
+            try {
+                $fromUrl = parse_url($fromOrigin);
+                $fromHost = $fromUrl['host'] ?? null;
+                
+                if ($fromHost) {
+                    // Check if this is a tenant domain
+                    $centralDomains = config('tenancy.central_domains', []);
+                    
+                    if (!in_array($fromHost, $centralDomains)) {
+                        // This is a tenant domain, redirect to tenant login
+                        $protocol = app()->environment('production') ? 'https' : 'http';
+                        $port = app()->environment('production') ? '' : ':8000';
+                        
+                        Log::info('Keycloak logout: Redirecting to tenant login', [
+                            'from_host' => $fromHost,
+                            'redirect_url' => "{$protocol}://{$fromHost}{$port}/login",
+                        ]);
+                        
+                        return redirect()->to("{$protocol}://{$fromHost}{$port}/login")
+                            ->with('status', 'You have been logged out successfully.');
+                    }
+                }
+            } catch (\Exception $e) {
+                Log::warning('Keycloak logout: Error parsing from parameter', [
+                    'from' => $fromOrigin,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         // If this is an Inertia request, return Inertia response
